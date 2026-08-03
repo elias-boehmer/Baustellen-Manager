@@ -8,8 +8,7 @@
 </head>
 <body>
 
-  <!-- LOGIN SCREEN -->
-  <div id="login-screen">
+  <div id="login-screen" class="hidden">
     <div class="login-background"></div>
     <div class="login-box">
       <div class="login-logo">🏗️</div>
@@ -20,21 +19,21 @@
         <div id="login-error" class="login-error hidden">❌ Falsches Passwort. Bitte erneut versuchen.</div>
         <button type="submit" class="btn-primary login-btn">Anmelden</button>
       </form>
-      <p class="login-hint">Kein Konto nötig — alle Daten bleiben lokal auf deinem Gerät.</p>
+      <div class="login-theme-row">
+        <button class="theme-toggle">☀️ Hell</button>
+      </div>
+      <p class="login-hint">Alle Daten bleiben lokal auf deinem Gerät.</p>
     </div>
   </div>
 
-  <!-- APP (hidden until logged in) -->
   <div id="app" class="hidden">
-
-    <!-- MOBILE TOPBAR -->
     <header class="topbar">
       <button class="hamburger" id="hamburger" aria-label="Menü öffnen">☰</button>
       <span class="topbar-title">🏗️ Baustelle</span>
+      <button class="theme-toggle">☀️ Hell</button>
       <button class="btn-logout" id="btn-logout" title="Abmelden">🔓</button>
     </header>
 
-    <!-- SIDEBAR OVERLAY (mobile) -->
     <div class="sidebar-overlay hidden" id="sidebar-overlay"></div>
 
     <nav class="sidebar" id="sidebar">
@@ -45,6 +44,7 @@
         <li><a href="#" class="nav-link" data-page="current">✅ Aktuell</a></li>
       </ul>
       <div class="sidebar-footer">
+        <button class="theme-toggle">☀️ Hell</button>
         <button class="btn-logout-sidebar" id="btn-logout-sidebar">🔓 Abmelden</button>
         <button class="btn-change-pin" id="btn-change-password">🔑 Passwort ändern</button>
       </div>
