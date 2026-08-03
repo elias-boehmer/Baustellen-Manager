@@ -1,6 +1,113 @@
 'use strict';
 
-// ─── DATA STORE ────────────────────────────────────────────────────────────────
+// ─── PIN / AUTH ──────────────────────────────────────────────────────────────
+const DEFAULT_PIN = '1234';
+const SESSION_KEY = 'bt_session';
+const PIN_KEY = 'bt_pin';
+const SESSION_HOURS = 8;
+
+function getPin() {
+  return localStorage.getItem(PIN_KEY) || DEFAULT_PIN;
+}
+
+function isLoggedIn() {
+  const raw = sessionStorage.getItem(SESSION_KEY);
+  if (!raw) return false;
+  try {
+    const { ts } = JSON.parse(raw);
+    return (Date.now() - ts) < SESSION_HOURS * 3600 * 1000;
+  } catch { return false; }
+}
+
+function login(pin) {
+  if (pin === getPin()) {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ts: Date.now() }));
+    return true;
+  }
+  return false;
+}
+
+function logout() {
+  sessionStorage.removeItem(SESSION_KEY);
+  location.reload();
+}
+
+// ─── BOOT ────────────────────────────────────────────────────────────────────
+const loginScreen = document.getElementById('login-screen');
+const appDiv = document.getElementById('app');
+
+if (isLoggedIn()) {
+  showApp();
+} else {
+  loginScreen.classList.remove('hidden');
+}
+
+function showApp() {
+  loginScreen.style.display = 'none';
+  appDiv.classList.remove('hidden');
+  renderTasks();
+}
+
+document.getElementById('login-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const pin = document.getElementById('login-pin').value;
+  const err = document.getElementById('login-error');
+  if (login(pin)) {
+    err.classList.add('hidden');
+    showApp();
+  } else {
+    err.classList.remove('hidden');
+    document.getElementById('login-pin').value = '';
+    document.getElementById('login-pin').focus();
+  }
+});
+
+document.getElementById('btn-logout').addEventListener('click', logout);
+document.getElementById('btn-logout-sidebar').addEventListener('click', logout);
+
+// ─── PIN ÄNDERN ──────────────────────────────────────────────────────────────
+const modalPin = document.getElementById('modal-pin');
+document.getElementById('btn-change-pin').addEventListener('click', () => {
+  ['pin-current','pin-new','pin-confirm'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pin-error').classList.add('hidden');
+  modalPin.classList.remove('hidden');
+});
+document.getElementById('btn-cancel-pin').addEventListener('click', () => modalPin.classList.add('hidden'));
+modalPin.addEventListener('click', e => { if (e.target === modalPin) modalPin.classList.add('hidden'); });
+
+document.getElementById('btn-save-pin').addEventListener('click', () => {
+  const cur = document.getElementById('pin-current').value;
+  const nw = document.getElementById('pin-new').value.trim();
+  const cf = document.getElementById('pin-confirm').value.trim();
+  const errEl = document.getElementById('pin-error');
+  if (cur !== getPin()) { showPinError('Aktueller PIN ist falsch.'); return; }
+  if (!nw || nw.length < 4) { showPinError('Neuer PIN muss mind. 4 Zeichen haben.'); return; }
+  if (nw !== cf) { showPinError('PINs stimmen nicht überein.'); return; }
+  localStorage.setItem(PIN_KEY, nw);
+  modalPin.classList.add('hidden');
+  alert('✅ PIN erfolgreich geändert!');
+});
+function showPinError(msg) {
+  const el = document.getElementById('pin-error');
+  el.textContent = '❌ ' + msg;
+  el.classList.remove('hidden');
+}
+
+// ─── MOBILE SIDEBAR ──────────────────────────────────────────────────────────
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('sidebar-overlay');
+
+document.getElementById('hamburger').addEventListener('click', () => {
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('visible');
+});
+overlay.addEventListener('click', closeSidebar);
+function closeSidebar() {
+  sidebar.classList.remove('open');
+  overlay.classList.remove('visible');
+}
+
+// ─── DATA STORE ──────────────────────────────────────────────────────────────
 const DB = {
   get tasks() { return JSON.parse(localStorage.getItem('bt_tasks') || '[]'); },
   set tasks(v) { localStorage.setItem('bt_tasks', JSON.stringify(v)); },
@@ -10,7 +117,7 @@ const DB = {
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
-// ─── NAVIGATION ────────────────────────────────────────────────────────────────
+// ─── NAVIGATION ──────────────────────────────────────────────────────────────
 document.querySelectorAll('.nav-link').forEach(link => {
   link.addEventListener('click', e => {
     e.preventDefault();
@@ -19,13 +126,14 @@ document.querySelectorAll('.nav-link').forEach(link => {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     link.classList.add('active');
     document.getElementById('page-' + page).classList.add('active');
+    closeSidebar();
     if (page === 'calendar') renderGantt();
     if (page === 'current') renderTodos();
     if (page === 'overview') renderTasks();
   });
 });
 
-// ─── STATUS HELPERS ─────────────────────────────────────────────────────────────
+// ─── STATUS HELPERS ───────────────────────────────────────────────────────────
 const STATUS_LABEL = {
   pending: '⏳ Start ausstehend',
   blocked: '🚫 Blockiert',
@@ -33,7 +141,7 @@ const STATUS_LABEL = {
   done: '✅ Erledigt',
 };
 
-// ─── TASKS ──────────────────────────────────────────────────────────────────────
+// ─── TASKS ────────────────────────────────────────────────────────────────────
 function renderTasks() {
   const container = document.getElementById('task-list');
   const tasks = DB.tasks.filter(t => !t.parentId);
@@ -45,9 +153,8 @@ function renderTasks() {
   bindTaskEvents();
 }
 
-function taskCardHTML(task, isSubtask = false) {
-  const allTasks = DB.tasks;
-  const subtasks = allTasks.filter(t => t.parentId === task.id);
+function taskCardHTML(task) {
+  const subtasks = DB.tasks.filter(t => t.parentId === task.id);
   const hasSubs = subtasks.length > 0;
 
   const dateTag = (task.startDate || task.endDate)
@@ -111,12 +218,10 @@ function bindTaskEvents() {
       if (toggle) toggle.classList.toggle('open');
     });
   });
-
   document.querySelectorAll('[data-action]').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
-      const action = btn.dataset.action;
-      const id = btn.dataset.id;
+      const { action, id } = btn.dataset;
       if (action === 'edit') openTaskModal(id);
       if (action === 'delete') deleteTask(id);
       if (action === 'add-sub') openTaskModal(null, id);
@@ -126,14 +231,11 @@ function bindTaskEvents() {
 
 function deleteTask(id) {
   if (!confirm('Aufgabe wirklich löschen?')) return;
-  let tasks = DB.tasks;
-  // delete task and its subtasks
-  tasks = tasks.filter(t => t.id !== id && t.parentId !== id);
-  DB.tasks = tasks;
+  DB.tasks = DB.tasks.filter(t => t.id !== id && t.parentId !== id);
   renderTasks();
 }
 
-// ─── TASK MODAL ─────────────────────────────────────────────────────────────────
+// ─── TASK MODAL ───────────────────────────────────────────────────────────────
 const modalTask = document.getElementById('modal-task');
 
 function openTaskModal(id = null, parentId = null) {
@@ -141,7 +243,6 @@ function openTaskModal(id = null, parentId = null) {
   document.getElementById('modal-task-title').textContent = isNew
     ? (parentId ? 'Neue Unteraufgabe' : 'Neue Aufgabe')
     : 'Aufgabe bearbeiten';
-
   if (!isNew) {
     const t = DB.tasks.find(t => t.id === id);
     if (!t) return;
@@ -156,9 +257,8 @@ function openTaskModal(id = null, parentId = null) {
     document.getElementById('ti-link').value = t.link || '';
     document.getElementById('ti-file').value = t.file || '';
   } else {
-    ['ti-id','ti-title','ti-start','ti-end','ti-budget','ti-note','ti-link','ti-file'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
+    ['ti-id','ti-title','ti-start','ti-end','ti-budget','ti-note','ti-link','ti-file']
+      .forEach(i => document.getElementById(i).value = '');
     document.getElementById('ti-status').value = 'pending';
     document.getElementById('ti-parent').value = parentId || '';
   }
@@ -173,13 +273,10 @@ modalTask.addEventListener('click', e => { if (e.target === modalTask) modalTask
 document.getElementById('btn-save-task').addEventListener('click', () => {
   const title = document.getElementById('ti-title').value.trim();
   if (!title) { alert('Bitte einen Titel eingeben.'); return; }
-
   const id = document.getElementById('ti-id').value || uid();
   const parentId = document.getElementById('ti-parent').value || null;
   const task = {
-    id,
-    parentId,
-    title,
+    id, parentId, title,
     status: document.getElementById('ti-status').value,
     startDate: document.getElementById('ti-start').value || null,
     endDate: document.getElementById('ti-end').value || null,
@@ -189,29 +286,23 @@ document.getElementById('btn-save-task').addEventListener('click', () => {
     file: document.getElementById('ti-file').value.trim() || null,
     createdAt: Date.now(),
   };
-
   const tasks = DB.tasks;
   const idx = tasks.findIndex(t => t.id === id);
   if (idx >= 0) tasks[idx] = { ...tasks[idx], ...task };
   else tasks.push(task);
   DB.tasks = tasks;
-
   modalTask.classList.add('hidden');
   renderTasks();
 });
 
-// ─── GANTT / CALENDAR ──────────────────────────────────────────────────────────
+// ─── GANTT ────────────────────────────────────────────────────────────────────
 function renderGantt() {
   const container = document.getElementById('gantt-container');
-  const tasks = DB.tasks;
-  const dated = tasks.filter(t => t.startDate || t.endDate);
-
+  const dated = DB.tasks.filter(t => t.startDate || t.endDate);
   if (!dated.length) {
     container.innerHTML = `<div class="empty-state"><div class="icon">📅</div>Noch keine Aufgaben mit Daten vorhanden.</div>`;
     return;
   }
-
-  // find overall range
   const allDates = dated.flatMap(t => [t.startDate, t.endDate].filter(Boolean)).map(d => new Date(d));
   const minDate = new Date(Math.min(...allDates));
   const maxDate = new Date(Math.max(...allDates));
@@ -249,7 +340,7 @@ function fmtDate(d) {
   return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-// ─── TODOS ──────────────────────────────────────────────────────────────────────
+// ─── TODOS ────────────────────────────────────────────────────────────────────
 function renderTodos() {
   const container = document.getElementById('todo-list');
   const todos = DB.todos;
@@ -277,8 +368,7 @@ function renderTodos() {
 
   container.querySelectorAll('[data-action]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const action = btn.dataset.action;
-      const id = btn.dataset.id;
+      const { action, id } = btn.dataset;
       if (action === 'toggle-todo') toggleTodo(id);
       if (action === 'edit-todo') openTodoModal(id);
       if (action === 'delete-todo') deleteTodo(id);
@@ -300,7 +390,7 @@ function deleteTodo(id) {
   renderTodos();
 }
 
-// ─── TODO MODAL ─────────────────────────────────────────────────────────────────
+// ─── TODO MODAL ───────────────────────────────────────────────────────────────
 const modalTodo = document.getElementById('modal-todo');
 
 function openTodoModal(id = null) {
@@ -328,12 +418,10 @@ document.getElementById('btn-save-todo').addEventListener('click', () => {
   if (!title) { alert('Bitte einen Titel eingeben.'); return; }
   const id = document.getElementById('td-id').value || uid();
   const todo = {
-    id,
-    title,
+    id, title,
     dueDate: document.getElementById('td-due').value || null,
     note: document.getElementById('td-note').value.trim() || null,
-    done: false,
-    createdAt: Date.now(),
+    done: false, createdAt: Date.now(),
   };
   const todos = DB.todos;
   const idx = todos.findIndex(t => t.id === id);
@@ -344,10 +432,9 @@ document.getElementById('btn-save-todo').addEventListener('click', () => {
   renderTodos();
 });
 
-// ─── UTILS ──────────────────────────────────────────────────────────────────────
+// ─── UTILS ────────────────────────────────────────────────────────────────────
 function escHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
-// ─── INIT ───────────────────────────────────────────────────────────────────────
-renderTasks();

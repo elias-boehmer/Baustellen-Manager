@@ -7,48 +7,80 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <nav class="sidebar">
-    <div class="logo">🏗️ Baustelle</div>
-    <ul>
-      <li><a href="#" class="nav-link active" data-page="overview">📋 Übersicht</a></li>
-      <li><a href="#" class="nav-link" data-page="calendar">📅 Kalender</a></li>
-      <li><a href="#" class="nav-link" data-page="current">✅ Aktuell</a></li>
-    </ul>
-  </nav>
 
-  <main class="content">
-    <!-- ÜBERSICHT -->
-    <section id="page-overview" class="page active">
-      <div class="page-header">
-        <h1>Übersicht</h1>
-        <button class="btn-primary" id="btn-add-task">+ Aufgabe hinzufügen</button>
+  <!-- LOGIN SCREEN -->
+  <div id="login-screen">
+    <div class="login-box">
+      <div class="login-logo">🏗️</div>
+      <h1>Baustellen-Tracker</h1>
+      <p class="login-sub">Bitte PIN eingeben, um fortzufahren.</p>
+      <form id="login-form" autocomplete="off">
+        <input id="login-pin" type="password" placeholder="PIN / Passwort" autocomplete="current-password" />
+        <div id="login-error" class="login-error hidden">❌ Falscher PIN. Bitte erneut versuchen.</div>
+        <button type="submit" class="btn-primary login-btn">Anmelden</button>
+      </form>
+      <p class="login-hint">Kein Konto nötig — alle Daten bleiben lokal auf deinem Gerät.</p>
+    </div>
+  </div>
+
+  <!-- APP (hidden until logged in) -->
+  <div id="app" class="hidden">
+
+    <!-- MOBILE TOPBAR -->
+    <header class="topbar">
+      <button class="hamburger" id="hamburger" aria-label="Menü öffnen">☰</button>
+      <span class="topbar-title">🏗️ Baustelle</span>
+      <button class="btn-logout" id="btn-logout" title="Abmelden">🔓</button>
+    </header>
+
+    <!-- SIDEBAR OVERLAY (mobile) -->
+    <div class="sidebar-overlay hidden" id="sidebar-overlay"></div>
+
+    <nav class="sidebar" id="sidebar">
+      <div class="logo">🏗️ Baustelle</div>
+      <ul>
+        <li><a href="#" class="nav-link active" data-page="overview">📋 Übersicht</a></li>
+        <li><a href="#" class="nav-link" data-page="calendar">📅 Kalender</a></li>
+        <li><a href="#" class="nav-link" data-page="current">✅ Aktuell</a></li>
+      </ul>
+      <div class="sidebar-footer">
+        <button class="btn-logout-sidebar" id="btn-logout-sidebar">🔓 Abmelden</button>
+        <button class="btn-change-pin" id="btn-change-pin">🔑 PIN ändern</button>
       </div>
-      <div id="task-list"></div>
-    </section>
+    </nav>
 
-    <!-- KALENDER -->
-    <section id="page-calendar" class="page">
-      <div class="page-header"><h1>Kalender / Zeitstrahl</h1></div>
-      <div id="gantt-container"></div>
-    </section>
+    <main class="content">
+      <!-- ÜBERSICHT -->
+      <section id="page-overview" class="page active">
+        <div class="page-header">
+          <h1>Übersicht</h1>
+          <button class="btn-primary" id="btn-add-task">+ Aufgabe</button>
+        </div>
+        <div id="task-list"></div>
+      </section>
 
-    <!-- AKTUELL -->
-    <section id="page-current" class="page">
-      <div class="page-header">
-        <h1>Aktuell – Meine To-Dos</h1>
-        <button class="btn-primary" id="btn-add-todo">+ To-Do hinzufügen</button>
-      </div>
-      <div id="todo-list"></div>
-    </section>
-  </main>
+      <!-- KALENDER -->
+      <section id="page-calendar" class="page">
+        <div class="page-header"><h1>Kalender / Zeitstrahl</h1></div>
+        <div id="gantt-container"></div>
+      </section>
 
-  <!-- MODAL: Aufgabe anlegen/bearbeiten -->
+      <!-- AKTUELL -->
+      <section id="page-current" class="page">
+        <div class="page-header">
+          <h1>Aktuell – Meine To-Dos</h1>
+          <button class="btn-primary" id="btn-add-todo">+ To-Do</button>
+        </div>
+        <div id="todo-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL: Aufgabe -->
   <div id="modal-task" class="modal hidden">
     <div class="modal-box">
       <h2 id="modal-task-title">Neue Aufgabe</h2>
-      <label>Titel *
-        <input id="ti-title" type="text" placeholder="z.B. Rohbau fertigstellen" />
-      </label>
+      <label>Titel *<input id="ti-title" type="text" placeholder="z.B. Rohbau fertigstellen" /></label>
       <label>Status
         <select id="ti-status">
           <option value="pending">⏳ Start ausstehend</option>
@@ -58,25 +90,13 @@
         </select>
       </label>
       <div class="row-2">
-        <label>Start
-          <input id="ti-start" type="date" />
-        </label>
-        <label>Ende
-          <input id="ti-end" type="date" />
-        </label>
+        <label>Start<input id="ti-start" type="date" /></label>
+        <label>Ende<input id="ti-end" type="date" /></label>
       </div>
-      <label>Budget (€)
-        <input id="ti-budget" type="number" placeholder="0" min="0" />
-      </label>
-      <label>Hinweis
-        <textarea id="ti-note" rows="3" placeholder="Notizen, Details ..."></textarea>
-      </label>
-      <label>Link
-        <input id="ti-link" type="url" placeholder="https://" />
-      </label>
-      <label>Datei (Name/Pfad)
-        <input id="ti-file" type="text" placeholder="z.B. Angebot_Dachdecker.pdf" />
-      </label>
+      <label>Budget (€)<input id="ti-budget" type="number" placeholder="0" min="0" /></label>
+      <label>Hinweis<textarea id="ti-note" rows="3" placeholder="Notizen, Details ..."></textarea></label>
+      <label>Link<input id="ti-link" type="url" placeholder="https://" /></label>
+      <label>Datei (Name/Pfad)<input id="ti-file" type="text" placeholder="z.B. Angebot_Dachdecker.pdf" /></label>
       <input type="hidden" id="ti-id" />
       <input type="hidden" id="ti-parent" />
       <div class="modal-actions">
@@ -90,19 +110,28 @@
   <div id="modal-todo" class="modal hidden">
     <div class="modal-box">
       <h2 id="modal-todo-title">Neues To-Do</h2>
-      <label>Titel *
-        <input id="td-title" type="text" placeholder="To-Do beschreiben ..." />
-      </label>
-      <label>Fällig am
-        <input id="td-due" type="date" />
-      </label>
-      <label>Hinweis
-        <textarea id="td-note" rows="2" placeholder="Optionaler Hinweis ..."></textarea>
-      </label>
+      <label>Titel *<input id="td-title" type="text" placeholder="To-Do beschreiben ..." /></label>
+      <label>Fällig am<input id="td-due" type="date" /></label>
+      <label>Hinweis<textarea id="td-note" rows="2" placeholder="Optionaler Hinweis ..."></textarea></label>
       <input type="hidden" id="td-id" />
       <div class="modal-actions">
         <button class="btn-secondary" id="btn-cancel-todo">Abbrechen</button>
         <button class="btn-primary" id="btn-save-todo">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PIN ändern -->
+  <div id="modal-pin" class="modal hidden">
+    <div class="modal-box">
+      <h2>🔑 PIN ändern</h2>
+      <label>Aktueller PIN<input id="pin-current" type="password" /></label>
+      <label>Neuer PIN<input id="pin-new" type="password" /></label>
+      <label>Neuen PIN bestätigen<input id="pin-confirm" type="password" /></label>
+      <div id="pin-error" class="login-error hidden"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="btn-cancel-pin">Abbrechen</button>
+        <button class="btn-primary" id="btn-save-pin">Speichern</button>
       </div>
     </div>
   </div>
