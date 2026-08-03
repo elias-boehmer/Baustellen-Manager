@@ -49,6 +49,7 @@
         <li><a href="#" class="nav-link" data-page="current">✅ Aktuell</a></li>
       </ul>
       <div class="sidebar-footer">
+        <button class="btn-logout-sidebar" id="btn-theme-toggle">🌓 Farbschema wechseln</button>
         <button class="btn-logout-sidebar" id="btn-change-password">🔑 Passwort ändern</button>
         <button class="btn-logout-sidebar" id="btn-logout-sidebar">🔓 Abmelden</button>
       </div>
@@ -136,6 +137,12 @@
     </div>
   </div>
 
+  <script>
+    (function() {
+      var saved = localStorage.getItem('bt-theme');
+      if (saved === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    })();
+  </script>
   <script type="module" src="app.js"></script>
 </body>
 </html>
