@@ -79,6 +79,7 @@ document.getElementById('btn-logout').addEventListener('click', () => signOut(au
 document.getElementById('btn-logout-sidebar').addEventListener('click', () => signOut(auth));
 document.getElementById('hamburger').addEventListener('click', toggleSidebar);
 overlay.addEventListener('click', closeSidebar);
+document.getElementById('btn-theme-toggle').addEventListener('click', toggleTheme);
 
 document.querySelectorAll('.nav-link').forEach(link => {
   link.addEventListener('click', e => {
@@ -128,6 +129,17 @@ onAuthStateChanged(auth, user => {
     showLogin();
   }
 });
+
+function toggleTheme() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  if (isLight) {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('bt-theme', 'dark');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'light');
+    localStorage.setItem('bt-theme', 'light');
+  }
+}
 
 function toggleAuthMode(e) {
   e.preventDefault();
@@ -364,7 +376,7 @@ function taskCardHTML(task) {
   const subsHTML = subtasks.map(st =>
     '<div class="subtask-card" data-id="' + st.id + '">' +
     '<div class="status-dot ' + st.status + '"></div>' +
-    '<span class="task-title">' + escHtml(st.title) + '</span>' +
+    '<span class="task-title" data-action="edit" data-id="' + st.id + '">' + escHtml(st.title) + '</span>' +
     '<div class="task-meta">' +
     (st.budget ? '<span class="tag budget">💶 ' + Number(st.budget).toLocaleString('de-DE') + ' €</span>' : '') +
     (st.startDate ? '<span class="tag">📅 ' + st.startDate + '</span>' : '') +
@@ -379,7 +391,7 @@ function taskCardHTML(task) {
     '<div class="task-header">' +
     '<span class="task-toggle ' + (hasSubs ? '' : 'invisible') + '">▶</span>' +
     '<div class="status-dot ' + task.status + '"></div>' +
-    '<span class="task-title">' + escHtml(task.title) + '</span>' +
+    '<span class="task-title" data-action="edit" data-id="' + task.id + '">' + escHtml(task.title) + '</span>' +
     '<div class="task-meta">' +
     '<span class="tag">' + (STATUS_LABEL[task.status]||task.status) + '</span>' +
     dateTag + budgetTag +
@@ -406,6 +418,7 @@ function bindTaskEvents() {
   document.querySelectorAll('.task-header').forEach(header => {
     header.addEventListener('click', e => {
       if (e.target.closest('.task-actions')) return;
+      if (e.target.closest('.task-title')) return;
       const card = header.closest('.task-card');
       const body = card.querySelector('.task-body');
       const toggle = header.querySelector('.task-toggle');
@@ -525,6 +538,11 @@ function renderGantt() {
   const maxDate = new Date(Math.max(...allDates));
   const totalMs = Math.max(maxDate - minDate, 1);
 
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const todayInRange = today >= minDate && today <= maxDate;
+  const todayLeft = ((today - minDate) / totalMs * 100).toFixed(2);
+
   const rows = ordered.map(o => {
     const t = o.task;
     const s = t.startDate ? new Date(t.startDate) : minDate;
@@ -533,16 +551,22 @@ function renderGantt() {
     const width = Math.max(((e - s) / totalMs * 100), 0.8).toFixed(1);
     const rowClass = o.isMain ? 'gantt-main' : 'gantt-sub';
 
+    const todayLine = todayInRange
+      ? '<div class="gantt-today-line" style="left:' + todayLeft + '%"></div>' : '';
+
     return '<tr class="' + rowClass + '">' +
       '<td>' + (o.isMain ? '' : ' ↳ ') + escHtml(t.title) + '</td>' +
       '<td><span class="tag">' + (STATUS_LABEL[t.status]||t.status) + '</span></td>' +
       '<td>' + (t.startDate||'—') + '</td>' +
       '<td>' + (t.endDate||'—') + '</td>' +
-      '<td class="gantt-bar-cell"><div class="gantt-bar-outer"><div class="gantt-bar ' + t.status + '" style="left:' + left + '%;width:' + width + '%">' + (width > 8 ? escHtml(t.title) : '') + '</div></div></td>' +
+      '<td class="gantt-bar-cell"><div class="gantt-bar-outer"><div class="gantt-bar ' + t.status + '" style="left:' + left + '%;width:' + width + '%">' + (width > 8 ? escHtml(t.title) : '') + '</div>' + todayLine + '</div></td>' +
       '</tr>';
   }).join('');
 
-  container.innerHTML = '<div class="gantt-wrapper"><table class="gantt-table"><thead><tr><th>Aufgabe</th><th>Status</th><th>Start</th><th>Ende</th><th>Zeitstrahl (' + fmtDate(minDate) + ' – ' + fmtDate(maxDate) + ')</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  const legend = todayInRange
+    ? '<div class="gantt-today-legend"><span class="dot"></span>Heute (' + fmtDate(today) + ')</div>' : '';
+
+  container.innerHTML = legend + '<div class="gantt-wrapper"><table class="gantt-table"><thead><tr><th>Aufgabe</th><th>Status</th><th>Start</th><th>Ende</th><th>Zeitstrahl (' + fmtDate(minDate) + ' – ' + fmtDate(maxDate) + ')</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
 function fmtDate(d) {
