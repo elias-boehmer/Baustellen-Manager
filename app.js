@@ -1,151 +1,224 @@
 'use strict';
 
-// --- AUTH ---
-const DEFAULT_PASSWORD = '1234';
-const SESSION_KEY = 'bt_session';
-const PASSWORD_KEY = 'bt_password';
-const SESSION_DAYS = 30;
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  deleteDoc,
+  onSnapshot
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
-function getPassword() {
-  return localStorage.getItem(PASSWORD_KEY) || DEFAULT_PASSWORD;
-}
-function isLoggedIn() {
-  const raw = localStorage.getItem(SESSION_KEY);
-  if (!raw) return false;
-  try {
-    const { ts } = JSON.parse(raw);
-    return (Date.now() - ts) < SESSION_DAYS * 86400000;
-  } catch { return false; }
-}
-function doLogin(password) {
-  if (password === getPassword()) {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ ts: Date.now() }));
-    return true;
-  }
-  return false;
-}
-function logout() {
-  localStorage.removeItem(SESSION_KEY);
-  location.reload();
-}
+const firebaseConfig = {
+  apiKey: "AIzaSyB0Sz7MgJp9m-bIoKZq5WCm0-UpFoUyxa4",
+  authDomain: "baustellen-tracker-ebo.firebaseapp.com",
+  projectId: "baustellen-tracker-ebo",
+  storageBucket: "baustellen-tracker-ebo.firebasestorage.app",
+  messagingSenderId: "1035472747084",
+  appId: "1:1035472747084:web:9190c057f5375ade1512e9"
+};
 
-// --- BOOT ---
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
+
+const state = {
+  user: null,
+  tasks: [],
+  todos: [],
+  unsubs: []
+};
+
+const STATUS_LABEL = {
+  pending: '⏳ Start ausstehend',
+  blocked: '🚫 Blockiert',
+  inprogress: '🔄 In Bearbeitung',
+  done: '✅ Erledigt'
+};
+
 const loginScreen = document.getElementById('login-screen');
+const loginForm = document.getElementById('login-form');
+const loginEmail = document.getElementById('login-email');
+const loginPassword = document.getElementById('login-password');
+const loginError = document.getElementById('login-error');
 const appDiv = document.getElementById('app');
 
-if (isLoggedIn()) {
-  loginScreen.style.display = 'none';
-  appDiv.classList.remove('hidden');
-  renderTasks();
-}
-
-document.getElementById('login-form').addEventListener('submit', e => {
-  e.preventDefault();
-  const field = document.getElementById('login-password');
-  const err = document.getElementById('login-error');
-  const val = field.value;
-  if (!val.trim()) return;
-  if (doLogin(val)) {
-    loginScreen.style.display = 'none';
-    appDiv.classList.remove('hidden');
-    err.classList.add('hidden');
-    renderTasks();
-  } else {
-    err.classList.remove('hidden');
-    field.value = '';
-    field.focus();
-  }
-});
-
-document.getElementById('btn-logout').addEventListener('click', logout);
-document.getElementById('btn-logout-sidebar').addEventListener('click', logout);
-
-// --- CHANGE PASSWORD ---
-const modalPin = document.getElementById('modal-pin');
-document.getElementById('btn-change-password').addEventListener('click', () => {
-  ['pin-current','pin-new','pin-confirm'].forEach(id => { document.getElementById(id).value = ''; });
-  document.getElementById('pin-error').classList.add('hidden');
-  modalPin.classList.remove('hidden');
-});
-document.getElementById('btn-cancel-pin').addEventListener('click', () => modalPin.classList.add('hidden'));
-modalPin.addEventListener('click', e => { if (e.target === modalPin) modalPin.classList.add('hidden'); });
-document.getElementById('btn-save-pin').addEventListener('click', () => {
-  const cur = document.getElementById('pin-current').value;
-  const nw = document.getElementById('pin-new').value.trim();
-  const cf = document.getElementById('pin-confirm').value.trim();
-  if (cur !== getPassword()) { setPinError('Aktuelles Passwort ist falsch.'); return; }
-  if (!nw || nw.length < 4) { setPinError('Neues Passwort muss mind. 4 Zeichen haben.'); return; }
-  if (nw !== cf) { setPinError('Passwörter stimmen nicht überein.'); return; }
-  localStorage.setItem(PASSWORD_KEY, nw);
-  modalPin.classList.add('hidden');
-  alert('✅ Passwort erfolgreich geändert!');
-});
-function setPinError(msg) {
-  const el = document.getElementById('pin-error');
-  el.textContent = '❌ ' + msg;
-  el.classList.remove('hidden');
-}
-
-// --- MOBILE SIDEBAR ---
 const sidebar = document.getElementById('sidebar');
 const overlay = document.getElementById('sidebar-overlay');
-document.getElementById('hamburger').addEventListener('click', () => {
-  sidebar.classList.toggle('open');
-  overlay.classList.toggle('visible');
-});
-overlay.addEventListener('click', closeSidebar);
-function closeSidebar() {
-  sidebar.classList.remove('open');
-  overlay.classList.remove('visible');
-}
 
-// --- NAVIGATION ---
+const modalTask = document.getElementById('modal-task');
+const modalTodo = document.getElementById('modal-todo');
+
+loginForm.addEventListener('submit', handleLogin);
+document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
+document.getElementById('btn-logout-sidebar').addEventListener('click', () => signOut(auth));
+document.getElementById('hamburger').addEventListener('click', toggleSidebar);
+overlay.addEventListener('click', closeSidebar);
+
 document.querySelectorAll('.nav-link').forEach(link => {
   link.addEventListener('click', e => {
     e.preventDefault();
     const page = link.dataset.page;
+
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+
     link.classList.add('active');
     document.getElementById('page-' + page).classList.add('active');
     closeSidebar();
+
     if (page === 'calendar') renderGantt();
     else if (page === 'current') renderTodos();
     else renderTasks();
   });
 });
 
-// --- DATA STORE ---
-const DB = {
-  get tasks() { return JSON.parse(localStorage.getItem('bt_tasks') || '[]'); },
-  set tasks(v) { localStorage.setItem('bt_tasks', JSON.stringify(v)); },
-  get todos() { return JSON.parse(localStorage.getItem('bt_todos') || '[]'); },
-  set todos(v) { localStorage.setItem('bt_todos', JSON.stringify(v)); },
-};
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+document.getElementById('btn-add-task').addEventListener('click', () => openTaskModal());
+document.getElementById('btn-cancel-task').addEventListener('click', () => modalTask.classList.add('hidden'));
+modalTask.addEventListener('click', e => { if (e.target === modalTask) modalTask.classList.add('hidden'); });
+document.getElementById('btn-save-task').addEventListener('click', saveTask);
 
-const STATUS_LABEL = {
-  pending: '⏳ Start ausstehend',
-  blocked: '🚫 Blockiert',
-  inprogress: '🔄 In Bearbeitung',
-  done: '✅ Erledigt',
-};
+document.getElementById('btn-add-todo').addEventListener('click', () => openTodoModal());
+document.getElementById('btn-cancel-todo').addEventListener('click', () => modalTodo.classList.add('hidden'));
+modalTodo.addEventListener('click', e => { if (e.target === modalTodo) modalTodo.classList.add('hidden'); });
+document.getElementById('btn-save-todo').addEventListener('click', saveTodo);
 
-// --- TASKS ---
+onAuthStateChanged(auth, user => {
+  clearSubscriptions();
+  state.user = user || null;
+
+  if (user) {
+    showApp();
+    startLiveSync(user.uid);
+  } else {
+    showLogin();
+  }
+});
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const email = loginEmail.value.trim();
+  const password = loginPassword.value;
+
+  loginError.classList.add('hidden');
+  loginError.textContent = '';
+
+  if (!email || !password) return;
+
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (error) {
+    loginError.textContent = mapAuthError(error);
+    loginError.classList.remove('hidden');
+    loginPassword.value = '';
+    loginPassword.focus();
+  }
+}
+
+function showLogin() {
+  loginScreen.classList.remove('hidden');
+  appDiv.classList.add('hidden');
+  state.tasks = [];
+  state.todos = [];
+  renderTasks();
+  renderTodos();
+  renderGantt();
+}
+
+function showApp() {
+  loginScreen.classList.add('hidden');
+  appDiv.classList.remove('hidden');
+  loginError.classList.add('hidden');
+  loginPassword.value = '';
+}
+
+function startLiveSync(uid) {
+  const tasksUnsub = onSnapshot(collection(db, 'users', uid, 'tasks'), snap => {
+    state.tasks = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    renderTasks();
+    renderGantt();
+  });
+
+  const todosUnsub = onSnapshot(collection(db, 'users', uid, 'todos'), snap => {
+    state.todos = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    renderTodos();
+  });
+
+  state.unsubs = [tasksUnsub, todosUnsub];
+}
+
+function clearSubscriptions() {
+  state.unsubs.forEach(unsub => { try { unsub(); } catch (e) {} });
+  state.unsubs = [];
+}
+
+function toggleSidebar() {
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('hidden');
+  overlay.classList.toggle('visible');
+}
+
+function closeSidebar() {
+  sidebar.classList.remove('open');
+  overlay.classList.add('hidden');
+  overlay.classList.remove('visible');
+}
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function mapAuthError(error) {
+  const code = (error && error.code) || '';
+  if (code.includes('invalid-credential')) return '❌ E-Mail oder Passwort ist falsch.';
+  if (code.includes('invalid-email')) return '❌ Die E-Mail-Adresse ist ungültig.';
+  if (code.includes('too-many-requests')) return '❌ Zu viele Versuche. Bitte kurz warten.';
+  return '❌ Anmeldung fehlgeschlagen.';
+}
+
+function taskDocRef(id) {
+  return doc(db, 'users', state.user.uid, 'tasks', id);
+}
+
+function todoDocRef(id) {
+  return doc(db, 'users', state.user.uid, 'todos', id);
+}
+
 function renderTasks() {
   const container = document.getElementById('task-list');
-  const tasks = DB.tasks.filter(t => !t.parentId);
+  const tasks = state.tasks.filter(t => !t.parentId);
+
   if (!tasks.length) {
     container.innerHTML = '<div class="empty-state"><div class="icon">📋</div>Noch keine Aufgaben. Lege jetzt deine erste an!</div>';
     return;
   }
+
   container.innerHTML = tasks.map(taskCardHTML).join('');
   bindTaskEvents();
 }
 
 function taskCardHTML(task) {
-  const subtasks = DB.tasks.filter(t => t.parentId === task.id);
+  const subtasks = state.tasks.filter(t => t.parentId === task.id);
   const hasSubs = subtasks.length > 0;
+
   const dateTag = (task.startDate || task.endDate)
     ? '<span class="tag">📅 ' + (task.startDate||'?') + ' → ' + (task.endDate||'?') + '</span>' : '';
   const budgetTag = task.budget
@@ -214,26 +287,19 @@ function bindTaskEvents() {
   });
 }
 
-function deleteTask(id) {
-  if (!confirm('Aufgabe wirklich löschen?')) return;
-  DB.tasks = DB.tasks.filter(t => t.id !== id && t.parentId !== id);
-  renderTasks();
-}
-
-// --- TASK MODAL ---
-const modalTask = document.getElementById('modal-task');
 function openTaskModal(id, parentId) {
   id = id || null; parentId = parentId || null;
   const isNew = !id;
   document.getElementById('modal-task-title').textContent =
     isNew ? (parentId ? 'Neue Unteraufgabe' : 'Neue Aufgabe') : 'Aufgabe bearbeiten';
+
   if (!isNew) {
-    const t = DB.tasks.find(t => t.id === id);
+    const t = state.tasks.find(t => t.id === id);
     if (!t) return;
     document.getElementById('ti-id').value = t.id;
     document.getElementById('ti-parent').value = t.parentId || '';
-    document.getElementById('ti-title').value = t.title;
-    document.getElementById('ti-status').value = t.status;
+    document.getElementById('ti-title').value = t.title || '';
+    document.getElementById('ti-status').value = t.status || 'pending';
     document.getElementById('ti-start').value = t.startDate || '';
     document.getElementById('ti-end').value = t.endDate || '';
     document.getElementById('ti-budget').value = t.budget || '';
@@ -246,18 +312,24 @@ function openTaskModal(id, parentId) {
     document.getElementById('ti-status').value = 'pending';
     document.getElementById('ti-parent').value = parentId || '';
   }
+
   modalTask.classList.remove('hidden');
   document.getElementById('ti-title').focus();
 }
-document.getElementById('btn-add-task').addEventListener('click', () => openTaskModal());
-document.getElementById('btn-cancel-task').addEventListener('click', () => modalTask.classList.add('hidden'));
-modalTask.addEventListener('click', e => { if (e.target === modalTask) modalTask.classList.add('hidden'); });
-document.getElementById('btn-save-task').addEventListener('click', () => {
+
+async function saveTask() {
+  if (!state.user) return;
+
   const title = document.getElementById('ti-title').value.trim();
   if (!title) { alert('Bitte einen Titel eingeben.'); return; }
+
   const id = document.getElementById('ti-id').value || uid();
-  const parentId = document.getElementById('ti-parent').value || null;
-  const task = { id, parentId, title,
+  const existing = state.tasks.find(t => t.id === id);
+
+  const task = {
+    id,
+    parentId: document.getElementById('ti-parent').value || null,
+    title,
     status: document.getElementById('ti-status').value,
     startDate: document.getElementById('ti-start').value || null,
     endDate: document.getElementById('ti-end').value || null,
@@ -265,33 +337,42 @@ document.getElementById('btn-save-task').addEventListener('click', () => {
     note: document.getElementById('ti-note').value.trim() || null,
     link: document.getElementById('ti-link').value.trim() || null,
     file: document.getElementById('ti-file').value.trim() || null,
-    createdAt: Date.now() };
-  const tasks = DB.tasks;
-  const idx = tasks.findIndex(t => t.id === id);
-  if (idx >= 0) tasks[idx] = { ...tasks[idx], ...task };
-  else tasks.push(task);
-  DB.tasks = tasks;
-  modalTask.classList.add('hidden');
-  renderTasks();
-});
+    createdAt: (existing && existing.createdAt) || Date.now()
+  };
 
-// --- GANTT ---
+  await setDoc(taskDocRef(id), task);
+  modalTask.classList.add('hidden');
+}
+
+async function deleteTask(id) {
+  if (!state.user || !confirm('Aufgabe wirklich löschen?')) return;
+
+  const ids = state.tasks
+    .filter(t => t.id === id || t.parentId === id)
+    .map(t => t.id);
+
+  await Promise.all(ids.map(taskId => deleteDoc(taskDocRef(taskId))));
+}
+
 function renderGantt() {
   const container = document.getElementById('gantt-container');
-  const dated = DB.tasks.filter(t => t.startDate || t.endDate);
+  const dated = state.tasks.filter(t => t.startDate || t.endDate);
+
   if (!dated.length) {
     container.innerHTML = '<div class="empty-state"><div class="icon">📅</div>Noch keine Aufgaben mit Daten vorhanden.</div>';
     return;
   }
+
   const allDates = dated.flatMap(t => [t.startDate, t.endDate].filter(Boolean)).map(d => new Date(d));
   const minDate = new Date(Math.min(...allDates));
   const maxDate = new Date(Math.max(...allDates));
-  const totalMs = maxDate - minDate || 1;
+  const totalMs = Math.max(maxDate - minDate, 1);
+
   const rows = dated.map(t => {
     const s = t.startDate ? new Date(t.startDate) : minDate;
     const e = t.endDate ? new Date(t.endDate) : s;
     const left = ((s - minDate) / totalMs * 100).toFixed(1);
-    const width = Math.max(((e - s) / totalMs * 100), 0.5).toFixed(1);
+    const width = Math.max(((e - s) / totalMs * 100), 0.8).toFixed(1);
     return '<tr>' +
       '<td>' + (t.parentId ? ' ↳ ' : '') + escHtml(t.title) + '</td>' +
       '<td><span class="tag">' + (STATUS_LABEL[t.status]||t.status) + '</span></td>' +
@@ -300,18 +381,23 @@ function renderGantt() {
       '<td class="gantt-bar-cell"><div class="gantt-bar-outer"><div class="gantt-bar ' + t.status + '" style="left:' + left + '%;width:' + width + '%">' + (width > 8 ? escHtml(t.title) : '') + '</div></div></td>' +
       '</tr>';
   }).join('');
+
   container.innerHTML = '<div class="gantt-wrapper"><table class="gantt-table"><thead><tr><th>Aufgabe</th><th>Status</th><th>Start</th><th>Ende</th><th>Zeitstrahl (' + fmtDate(minDate) + ' – ' + fmtDate(maxDate) + ')</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
-function fmtDate(d) { return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
 
-// --- TODOS ---
+function fmtDate(d) {
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 function renderTodos() {
   const container = document.getElementById('todo-list');
-  const todos = DB.todos;
+  const todos = state.todos;
+
   if (!todos.length) {
     container.innerHTML = '<div class="empty-state"><div class="icon">✅</div>Keine To-Dos vorhanden. Super!</div>';
     return;
   }
+
   const today = new Date().toISOString().split('T')[0];
   container.innerHTML = todos.map(td => {
     const overdue = td.dueDate && td.dueDate < today && !td.done;
@@ -327,6 +413,7 @@ function renderTodos() {
       '<button class="icon-btn delete" data-action="delete-todo" data-id="' + td.id + '" title="Löschen">🗑️</button>' +
       '</div></div>';
   }).join('');
+
   container.querySelectorAll('[data-action]').forEach(btn => {
     btn.addEventListener('click', () => {
       const { action, id } = btn.dataset;
@@ -336,58 +423,56 @@ function renderTodos() {
     });
   });
 }
-function toggleTodo(id) {
-  const todos = DB.todos;
-  const t = todos.find(t => t.id === id);
-  if (t) t.done = !t.done;
-  DB.todos = todos;
-  renderTodos();
-}
-function deleteTodo(id) {
-  if (!confirm('To-Do löschen?')) return;
-  DB.todos = DB.todos.filter(t => t.id !== id);
-  renderTodos();
-}
 
-// --- TODO MODAL ---
-const modalTodo = document.getElementById('modal-todo');
 function openTodoModal(id) {
   id = id || null;
   document.getElementById('modal-todo-title').textContent = id ? 'To-Do bearbeiten' : 'Neues To-Do';
+
   if (id) {
-    const t = DB.todos.find(t => t.id === id);
+    const t = state.todos.find(t => t.id === id);
     if (!t) return;
     document.getElementById('td-id').value = t.id;
-    document.getElementById('td-title').value = t.title;
+    document.getElementById('td-title').value = t.title || '';
     document.getElementById('td-due').value = t.dueDate || '';
     document.getElementById('td-note').value = t.note || '';
   } else {
     ['td-id','td-title','td-due','td-note'].forEach(i => { document.getElementById(i).value = ''; });
   }
+
   modalTodo.classList.remove('hidden');
   document.getElementById('td-title').focus();
 }
-document.getElementById('btn-add-todo').addEventListener('click', () => openTodoModal());
-document.getElementById('btn-cancel-todo').addEventListener('click', () => modalTodo.classList.add('hidden'));
-modalTodo.addEventListener('click', e => { if (e.target === modalTodo) modalTodo.classList.add('hidden'); });
-document.getElementById('btn-save-todo').addEventListener('click', () => {
+
+async function saveTodo() {
+  if (!state.user) return;
+
   const title = document.getElementById('td-title').value.trim();
   if (!title) { alert('Bitte einen Titel eingeben.'); return; }
+
   const id = document.getElementById('td-id').value || uid();
-  const todo = { id, title,
+  const existing = state.todos.find(t => t.id === id);
+
+  const todo = {
+    id,
+    title,
     dueDate: document.getElementById('td-due').value || null,
     note: document.getElementById('td-note').value.trim() || null,
-    done: false, createdAt: Date.now() };
-  const todos = DB.todos;
-  const idx = todos.findIndex(t => t.id === id);
-  if (idx >= 0) todos[idx] = { ...todos[idx], ...todo, done: todos[idx].done };
-  else todos.push(todo);
-  DB.todos = todos;
-  modalTodo.classList.add('hidden');
-  renderTodos();
-});
+    done: (existing && existing.done) || false,
+    createdAt: (existing && existing.createdAt) || Date.now()
+  };
 
-// --- UTILS ---
-function escHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  await setDoc(todoDocRef(id), todo);
+  modalTodo.classList.add('hidden');
+}
+
+async function toggleTodo(id) {
+  if (!state.user) return;
+  const todo = state.todos.find(t => t.id === id);
+  if (!todo) return;
+  await setDoc(todoDocRef(id), Object.assign({}, todo, { done: !todo.done }), { merge: true });
+}
+
+async function deleteTodo(id) {
+  if (!state.user || !confirm('To-Do löschen?')) return;
+  await deleteDoc(todoDocRef(id));
 }
