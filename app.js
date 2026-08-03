@@ -1,38 +1,38 @@
 'use strict';
 
-// ─── PIN / AUTH ──────────────────────────────────────────────────────────────
-const DEFAULT_PIN = '1234';
+const DEFAULT_PASSWORD = '1234';
 const SESSION_KEY = 'bt_session';
-const PIN_KEY = 'bt_pin';
-const SESSION_HOURS = 8;
+const PASSWORD_KEY = 'bt_password';
+const SESSION_DAYS = 30;
 
-function getPin() {
-  return localStorage.getItem(PIN_KEY) || DEFAULT_PIN;
+function getPassword() {
+  return localStorage.getItem(PASSWORD_KEY) || DEFAULT_PASSWORD;
 }
 
 function isLoggedIn() {
-  const raw = sessionStorage.getItem(SESSION_KEY);
+  const raw = localStorage.getItem(SESSION_KEY);
   if (!raw) return false;
   try {
     const { ts } = JSON.parse(raw);
-    return (Date.now() - ts) < SESSION_HOURS * 3600 * 1000;
-  } catch { return false; }
+    return (Date.now() - ts) < SESSION_DAYS * 24 * 3600 * 1000;
+  } catch {
+    return false;
+  }
 }
 
-function login(pin) {
-  if (pin === getPin()) {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ts: Date.now() }));
+function login(password) {
+  if (password === getPassword()) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ ts: Date.now() }));
     return true;
   }
   return false;
 }
 
 function logout() {
-  sessionStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_KEY);
   location.reload();
 }
 
-// ─── BOOT ────────────────────────────────────────────────────────────────────
 const loginScreen = document.getElementById('login-screen');
 const appDiv = document.getElementById('app');
 
@@ -50,24 +50,31 @@ function showApp() {
 
 document.getElementById('login-form').addEventListener('submit', e => {
   e.preventDefault();
-  const pin = document.getElementById('login-pin').value;
+  const passwordField = document.getElementById('login-password');
+  const password = passwordField.value;
   const err = document.getElementById('login-error');
-  if (login(pin)) {
+
+  if (!password.trim()) {
+    err.classList.add('hidden');
+    passwordField.focus();
+    return;
+  }
+
+  if (login(password)) {
     err.classList.add('hidden');
     showApp();
   } else {
     err.classList.remove('hidden');
-    document.getElementById('login-pin').value = '';
-    document.getElementById('login-pin').focus();
+    passwordField.value = '';
+    passwordField.focus();
   }
 });
 
 document.getElementById('btn-logout').addEventListener('click', logout);
 document.getElementById('btn-logout-sidebar').addEventListener('click', logout);
 
-// ─── PIN ÄNDERN ──────────────────────────────────────────────────────────────
 const modalPin = document.getElementById('modal-pin');
-document.getElementById('btn-change-pin').addEventListener('click', () => {
+document.getElementById('btn-change-password').addEventListener('click', () => {
   ['pin-current','pin-new','pin-confirm'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('pin-error').classList.add('hidden');
   modalPin.classList.remove('hidden');
@@ -79,13 +86,12 @@ document.getElementById('btn-save-pin').addEventListener('click', () => {
   const cur = document.getElementById('pin-current').value;
   const nw = document.getElementById('pin-new').value.trim();
   const cf = document.getElementById('pin-confirm').value.trim();
-  const errEl = document.getElementById('pin-error');
-  if (cur !== getPin()) { showPinError('Aktueller PIN ist falsch.'); return; }
-  if (!nw || nw.length < 4) { showPinError('Neuer PIN muss mind. 4 Zeichen haben.'); return; }
-  if (nw !== cf) { showPinError('PINs stimmen nicht überein.'); return; }
-  localStorage.setItem(PIN_KEY, nw);
+  if (cur !== getPassword()) { showPinError('Aktuelles Passwort ist falsch.'); return; }
+  if (!nw || nw.length < 4) { showPinError('Neues Passwort muss mind. 4 Zeichen haben.'); return; }
+  if (nw !== cf) { showPinError('Passwörter stimmen nicht überein.'); return; }
+  localStorage.setItem(PASSWORD_KEY, nw);
   modalPin.classList.add('hidden');
-  alert('✅ PIN erfolgreich geändert!');
+  alert('✅ Passwort erfolgreich geändert!');
 });
 function showPinError(msg) {
   const el = document.getElementById('pin-error');
@@ -93,7 +99,6 @@ function showPinError(msg) {
   el.classList.remove('hidden');
 }
 
-// ─── MOBILE SIDEBAR ──────────────────────────────────────────────────────────
 const sidebar = document.getElementById('sidebar');
 const overlay = document.getElementById('sidebar-overlay');
 
@@ -107,17 +112,6 @@ function closeSidebar() {
   overlay.classList.remove('visible');
 }
 
-// ─── DATA STORE ──────────────────────────────────────────────────────────────
-const DB = {
-  get tasks() { return JSON.parse(localStorage.getItem('bt_tasks') || '[]'); },
-  set tasks(v) { localStorage.setItem('bt_tasks', JSON.stringify(v)); },
-  get todos() { return JSON.parse(localStorage.getItem('bt_todos') || '[]'); },
-  set todos(v) { localStorage.setItem('bt_todos', JSON.stringify(v)); },
-};
-
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
-
-// ─── NAVIGATION ──────────────────────────────────────────────────────────────
 document.querySelectorAll('.nav-link').forEach(link => {
   link.addEventListener('click', e => {
     e.preventDefault();
@@ -133,7 +127,15 @@ document.querySelectorAll('.nav-link').forEach(link => {
   });
 });
 
-// ─── STATUS HELPERS ───────────────────────────────────────────────────────────
+const DB = {
+  get tasks() { return JSON.parse(localStorage.getItem('bt_tasks') || '[]'); },
+  set tasks(v) { localStorage.setItem('bt_tasks', JSON.stringify(v)); },
+  get todos() { return JSON.parse(localStorage.getItem('bt_todos') || '[]'); },
+  set todos(v) { localStorage.setItem('bt_todos', JSON.stringify(v)); },
+};
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
 const STATUS_LABEL = {
   pending: '⏳ Start ausstehend',
   blocked: '🚫 Blockiert',
@@ -141,7 +143,6 @@ const STATUS_LABEL = {
   done: '✅ Erledigt',
 };
 
-// ─── TASKS ────────────────────────────────────────────────────────────────────
 function renderTasks() {
   const container = document.getElementById('task-list');
   const tasks = DB.tasks.filter(t => !t.parentId);
@@ -156,7 +157,6 @@ function renderTasks() {
 function taskCardHTML(task) {
   const subtasks = DB.tasks.filter(t => t.parentId === task.id);
   const hasSubs = subtasks.length > 0;
-
   const dateTag = (task.startDate || task.endDate)
     ? `<span class="tag">📅 ${task.startDate || '?'} → ${task.endDate || '?'}</span>` : '';
   const budgetTag = task.budget
@@ -235,9 +235,7 @@ function deleteTask(id) {
   renderTasks();
 }
 
-// ─── TASK MODAL ───────────────────────────────────────────────────────────────
 const modalTask = document.getElementById('modal-task');
-
 function openTaskModal(id = null, parentId = null) {
   const isNew = !id;
   document.getElementById('modal-task-title').textContent = isNew
@@ -257,8 +255,7 @@ function openTaskModal(id = null, parentId = null) {
     document.getElementById('ti-link').value = t.link || '';
     document.getElementById('ti-file').value = t.file || '';
   } else {
-    ['ti-id','ti-title','ti-start','ti-end','ti-budget','ti-note','ti-link','ti-file']
-      .forEach(i => document.getElementById(i).value = '');
+    ['ti-id','ti-title','ti-start','ti-end','ti-budget','ti-note','ti-link','ti-file'].forEach(i => document.getElementById(i).value = '');
     document.getElementById('ti-status').value = 'pending';
     document.getElementById('ti-parent').value = parentId || '';
   }
@@ -295,7 +292,6 @@ document.getElementById('btn-save-task').addEventListener('click', () => {
   renderTasks();
 });
 
-// ─── GANTT ────────────────────────────────────────────────────────────────────
 function renderGantt() {
   const container = document.getElementById('gantt-container');
   const dated = DB.tasks.filter(t => t.startDate || t.endDate);
@@ -307,7 +303,6 @@ function renderGantt() {
   const minDate = new Date(Math.min(...allDates));
   const maxDate = new Date(Math.max(...allDates));
   const totalMs = maxDate - minDate || 1;
-
   const rows = dated.map(t => {
     const start = t.startDate ? new Date(t.startDate) : minDate;
     const end = t.endDate ? new Date(t.endDate) : start;
@@ -319,28 +314,13 @@ function renderGantt() {
       <td><span class="tag">${STATUS_LABEL[t.status] || t.status}</span></td>
       <td>${t.startDate || '—'}</td>
       <td>${t.endDate || '—'}</td>
-      <td class="gantt-bar-cell">
-        <div class="gantt-bar-outer">
-          <div class="gantt-bar ${t.status}" style="left:${left}%;width:${width}%">${width > 8 ? escHtml(t.title) : ''}</div>
-        </div>
-      </td>
+      <td class="gantt-bar-cell"><div class="gantt-bar-outer"><div class="gantt-bar ${t.status}" style="left:${left}%;width:${width}%">${width > 8 ? escHtml(t.title) : ''}</div></div></td>
     </tr>`;
   }).join('');
-
-  container.innerHTML = `
-    <div class="gantt-wrapper">
-      <table class="gantt-table">
-        <thead><tr><th>Aufgabe</th><th>Status</th><th>Start</th><th>Ende</th><th>Zeitstrahl (${fmtDate(minDate)} – ${fmtDate(maxDate)})</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
+  container.innerHTML = `<div class="gantt-wrapper"><table class="gantt-table"><thead><tr><th>Aufgabe</th><th>Status</th><th>Start</th><th>Ende</th><th>Zeitstrahl (${fmtDate(minDate)} – ${fmtDate(maxDate)})</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
+function fmtDate(d) { return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
 
-function fmtDate(d) {
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
-// ─── TODOS ────────────────────────────────────────────────────────────────────
 function renderTodos() {
   const container = document.getElementById('todo-list');
   const todos = DB.todos;
@@ -351,21 +331,8 @@ function renderTodos() {
   const today = new Date().toISOString().split('T')[0];
   container.innerHTML = todos.map(td => {
     const overdue = td.dueDate && td.dueDate < today && !td.done;
-    return `
-    <div class="todo-item" data-id="${td.id}">
-      <div class="todo-check ${td.done ? 'checked' : ''}" data-action="toggle-todo" data-id="${td.id}"></div>
-      <div class="todo-content">
-        <div class="todo-title ${td.done ? 'done-text' : ''}">${escHtml(td.title)}</div>
-        ${td.dueDate ? `<div class="todo-due ${overdue ? 'overdue' : ''}">📅 Fällig: ${td.dueDate}${overdue ? ' ⚠️ Überfällig' : ''}</div>` : ''}
-        ${td.note ? `<div class="todo-note">${escHtml(td.note)}</div>` : ''}
-      </div>
-      <div class="task-actions">
-        <button class="icon-btn" data-action="edit-todo" data-id="${td.id}" title="Bearbeiten">✏️</button>
-        <button class="icon-btn delete" data-action="delete-todo" data-id="${td.id}" title="Löschen">🗑️</button>
-      </div>
-    </div>`;
+    return `<div class="todo-item" data-id="${td.id}"><div class="todo-check ${td.done ? 'checked' : ''}" data-action="toggle-todo" data-id="${td.id}"></div><div class="todo-content"><div class="todo-title ${td.done ? 'done-text' : ''}">${escHtml(td.title)}</div>${td.dueDate ? `<div class="todo-due ${overdue ? 'overdue' : ''}">📅 Fällig: ${td.dueDate}${overdue ? ' ⚠️ Überfällig' : ''}</div>` : ''}${td.note ? `<div class="todo-note">${escHtml(td.note)}</div>` : ''}</div><div class="task-actions"><button class="icon-btn" data-action="edit-todo" data-id="${td.id}" title="Bearbeiten">✏️</button><button class="icon-btn delete" data-action="delete-todo" data-id="${td.id}" title="Löschen">🗑️</button></div></div>`;
   }).join('');
-
   container.querySelectorAll('[data-action]').forEach(btn => {
     btn.addEventListener('click', () => {
       const { action, id } = btn.dataset;
@@ -383,16 +350,13 @@ function toggleTodo(id) {
   DB.todos = todos;
   renderTodos();
 }
-
 function deleteTodo(id) {
   if (!confirm('To-Do löschen?')) return;
   DB.todos = DB.todos.filter(t => t.id !== id);
   renderTodos();
 }
 
-// ─── TODO MODAL ───────────────────────────────────────────────────────────────
 const modalTodo = document.getElementById('modal-todo');
-
 function openTodoModal(id = null) {
   document.getElementById('modal-todo-title').textContent = id ? 'To-Do bearbeiten' : 'Neues To-Do';
   if (id) {
@@ -417,12 +381,7 @@ document.getElementById('btn-save-todo').addEventListener('click', () => {
   const title = document.getElementById('td-title').value.trim();
   if (!title) { alert('Bitte einen Titel eingeben.'); return; }
   const id = document.getElementById('td-id').value || uid();
-  const todo = {
-    id, title,
-    dueDate: document.getElementById('td-due').value || null,
-    note: document.getElementById('td-note').value.trim() || null,
-    done: false, createdAt: Date.now(),
-  };
+  const todo = { id, title, dueDate: document.getElementById('td-due').value || null, note: document.getElementById('td-note').value.trim() || null, done: false, createdAt: Date.now() };
   const todos = DB.todos;
   const idx = todos.findIndex(t => t.id === id);
   if (idx >= 0) todos[idx] = { ...todos[idx], ...todo, done: todos[idx].done };
@@ -432,9 +391,6 @@ document.getElementById('btn-save-todo').addEventListener('click', () => {
   renderTodos();
 });
 
-// ─── UTILS ────────────────────────────────────────────────────────────────────
 function escHtml(str) {
-  return String(str)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }

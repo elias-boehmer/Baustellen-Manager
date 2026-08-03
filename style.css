@@ -25,7 +25,6 @@ body {
   min-height: 100vh;
 }
 
-/* ─── LOGIN ──────────────────────────────────────────── */
 #login-screen {
   min-height: 100vh;
   display: flex;
@@ -33,24 +32,38 @@ body {
   justify-content: center;
   padding: 20px;
   background: var(--bg);
+  position: relative;
+  overflow: hidden;
+}
+.login-background {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(15,17,23,0.68), rgba(15,17,23,0.82)),
+    url('https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
+  transform: scale(1.03);
 }
 .login-box {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  position: relative;
+  z-index: 2;
+  background: rgba(26, 29, 39, 0.86);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 16px;
   padding: 40px 36px;
   width: 100%;
-  max-width: 380px;
+  max-width: 390px;
   display: flex;
   flex-direction: column;
   gap: 14px;
   text-align: center;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.35);
 }
 .login-logo { font-size: 2.8rem; }
 .login-box h1 { font-size: 1.5rem; font-weight: 700; }
 .login-sub { color: var(--text-muted); font-size: 0.9rem; }
 #login-form { display: flex; flex-direction: column; gap: 10px; }
-#login-pin {
+#login-password {
   background: var(--surface2);
   border: 1px solid var(--border);
   color: var(--text);
@@ -58,11 +71,10 @@ body {
   border-radius: 8px;
   font-size: 1rem;
   text-align: center;
-  letter-spacing: 0.2em;
   outline: none;
   width: 100%;
 }
-#login-pin:focus { border-color: var(--accent); }
+#login-password:focus { border-color: var(--accent); }
 .login-btn { width: 100%; padding: 12px; font-size: 1rem; }
 .login-error {
   background: rgba(239,68,68,0.15);
@@ -73,12 +85,11 @@ body {
   font-size: 0.85rem;
 }
 .login-hint { color: var(--text-muted); font-size: 0.75rem; }
+.hidden { display: none !important; }
 
-/* ─── APP SHELL ──────────────────────────────────────── */
 #app { display: flex; min-height: 100vh; flex-direction: column; }
 #app.hidden { display: none; }
 
-/* ─── TOPBAR (mobile only) ───────────────────────────── */
 .topbar {
   display: none;
   height: var(--topbar-h);
@@ -105,11 +116,12 @@ body {
 }
 .btn-logout:hover { color: var(--blocked); background: var(--surface2); }
 
-/* ─── SIDEBAR ────────────────────────────────────────── */
 .sidebar {
   width: var(--sidebar-w);
   min-height: 100vh;
-  background: var(--surface);
+  background:
+    linear-gradient(rgba(26,29,39,0.94), rgba(26,29,39,0.98)),
+    url('https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=900&q=80') center/cover no-repeat;
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -169,13 +181,15 @@ body {
 }
 .sidebar-overlay.visible { display: block; }
 
-/* ─── CONTENT ────────────────────────────────────────── */
 .content {
   margin-left: var(--sidebar-w);
   flex: 1;
   padding: 32px;
   max-width: 1200px;
   width: 100%;
+  background:
+    linear-gradient(rgba(15,17,23,0.92), rgba(15,17,23,0.96)),
+    url('https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=1400&q=80') center/cover fixed no-repeat;
 }
 
 .page { display: none; }
@@ -190,7 +204,6 @@ body {
 }
 .page-header h1 { font-size: 1.5rem; font-weight: 700; }
 
-/* ─── BUTTONS ────────────────────────────────────────── */
 .btn-primary {
   background: var(--accent); color: #000; border: none;
   padding: 9px 18px; border-radius: var(--radius);
@@ -206,9 +219,8 @@ body {
 }
 .btn-secondary:hover { background: var(--border); }
 
-/* ─── TASK CARDS ─────────────────────────────────────── */
 .task-card {
-  background: var(--surface);
+  background: rgba(26,29,39,0.92);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   margin-bottom: 12px;
@@ -258,7 +270,7 @@ body {
 .task-body {
   display: none; padding: 0 16px 16px 40px;
   border-top: 1px solid var(--border);
-  background: var(--surface2);
+  background: rgba(34,38,58,0.92);
 }
 .task-body.open { display: block; }
 .task-detail {
@@ -274,7 +286,7 @@ body {
   letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 8px;
 }
 .subtask-card {
-  background: var(--surface);
+  background: rgba(26,29,39,0.95);
   border: 1px solid var(--border);
   border-radius: 8px; padding: 10px 14px; margin-bottom: 6px;
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -289,11 +301,11 @@ body {
 }
 .add-subtask-btn:hover { background: var(--surface); }
 
-/* ─── GANTT ──────────────────────────────────────────── */
 .gantt-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .gantt-table {
   width: 100%; border-collapse: collapse;
   font-size: 0.85rem; min-width: 600px;
+  background: rgba(26,29,39,0.92);
 }
 .gantt-table th {
   background: var(--surface); color: var(--text-muted);
@@ -317,9 +329,8 @@ body {
 .gantt-bar.inprogress { background: var(--inprogress); }
 .gantt-bar.done { background: var(--done); }
 
-/* ─── TODOS ──────────────────────────────────────────── */
 .todo-item {
-  background: var(--surface);
+  background: rgba(26,29,39,0.92);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 14px 16px; margin-bottom: 10px;
@@ -340,7 +351,6 @@ body {
 .todo-due.overdue { color: var(--blocked); }
 .todo-note { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; word-break: break-word; }
 
-/* ─── MODALS ─────────────────────────────────────────── */
 .modal {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.65);
@@ -349,7 +359,7 @@ body {
 }
 .modal.hidden { display: none; }
 .modal-box {
-  background: var(--surface);
+  background: rgba(26, 29, 39, 0.96);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 24px 28px;
@@ -379,10 +389,12 @@ body {
 .empty-state {
   text-align: center; color: var(--text-muted);
   padding: 60px 20px; font-size: 0.95rem;
+  background: rgba(26,29,39,0.78);
+  border: 1px solid var(--border);
+  border-radius: 14px;
 }
 .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
 
-/* ─── MOBILE ─────────────────────────────────────────── */
 @media (max-width: 768px) {
   .topbar { display: flex; }
 
@@ -393,12 +405,13 @@ body {
     min-height: 100dvh;
   }
   .sidebar.open { transform: translateX(0); }
-  .logo { display: block; }
 
   .content {
     margin-left: 0;
     padding: 16px 14px;
     padding-top: calc(var(--topbar-h) + 12px);
+    background-position: center;
+    background-attachment: scroll;
   }
 
   .page-header h1 { font-size: 1.2rem; }
@@ -413,4 +426,9 @@ body {
 
   .gantt-table { font-size: 0.78rem; }
   .gantt-bar-cell { min-width: 140px; }
+
+  .login-box {
+    padding: 28px 20px;
+    max-width: 100%;
+  }
 }
