@@ -41,7 +41,7 @@ const state = {
   tasks: [],
   todos: [],
   unsubs: [],
-  authMode: 'login' // 'login' | 'register'
+  authMode: 'login'
 };
 
 const STATUS_LABEL = {
@@ -94,7 +94,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
 
     if (page === 'calendar') renderGantt();
     else if (page === 'current') renderTodos();
-    else renderTasks();
+    else { renderStats(); renderTasks(); }
   });
 });
 
@@ -236,6 +236,7 @@ function showLogin() {
   appDiv.classList.add('hidden');
   state.tasks = [];
   state.todos = [];
+  renderStats();
   renderTasks();
   renderTodos();
   renderGantt();
@@ -253,6 +254,7 @@ function startLiveSync(uid) {
     state.tasks = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    renderStats();
     renderTasks();
     renderGantt();
   });
@@ -309,6 +311,32 @@ function taskDocRef(id) {
 
 function todoDocRef(id) {
   return doc(db, 'users', state.user.uid, 'todos', id);
+}
+
+function renderStats() {
+  const bar = document.getElementById('stats-bar');
+  if (!bar) return;
+
+  const mainTasks = state.tasks.filter(t => !t.parentId);
+  const subTasks = state.tasks.filter(t => t.parentId);
+
+  const openMain = mainTasks.filter(t => t.status !== 'done').length;
+  const openSub = subTasks.filter(t => t.status !== 'done').length;
+  const totalBudget = mainTasks.reduce((sum, t) => sum + (parseFloat(t.budget) || 0), 0);
+
+  bar.innerHTML =
+    '<div class="stat-card stat-main">' +
+      '<span class="stat-label">Offene Hauptaufgaben</span>' +
+      '<span class="stat-value">' + openMain + '</span>' +
+    '</div>' +
+    '<div class="stat-card stat-sub">' +
+      '<span class="stat-label">Offene Unteraufgaben</span>' +
+      '<span class="stat-value">' + openSub + '</span>' +
+    '</div>' +
+    '<div class="stat-card stat-budget">' +
+      '<span class="stat-label">Gesamtbudget</span>' +
+      '<span class="stat-value">' + totalBudget.toLocaleString('de-DE') + ' €</span>' +
+    '</div>';
 }
 
 function renderTasks() {
@@ -434,20 +462,29 @@ async function saveTask() {
 
   const id = document.getElementById('ti-id').value || uid();
   const existing = state.tasks.find(t => t.id === id);
+  const newStatus = document.getElementById('ti-status').value;
+  const wasNotDone = !existing || existing.status !== 'done';
 
   const task = {
     id,
     parentId: document.getElementById('ti-parent').value || null,
     title,
-    status: document.getElementById('ti-status').value,
+    status: newStatus,
     startDate: document.getElementById('ti-start').value || null,
     endDate: document.getElementById('ti-end').value || null,
     budget: document.getElementById('ti-budget').value || null,
     note: document.getElementById('ti-note').value.trim() || null,
     link: document.getElementById('ti-link').value.trim() || null,
     file: document.getElementById('ti-file').value.trim() || null,
-    createdAt: (existing && existing.createdAt) || Date.now()
+    createdAt: (existing && existing.createdAt) || Date.now(),
+    completedAt: (existing && existing.completedAt) || null
   };
+
+  if (newStatus === 'done' && wasNotDone) {
+    task.completedAt = new Date().toISOString().split('T')[0];
+  } else if (newStatus !== 'done') {
+    task.completedAt = null;
+  }
 
   await setDoc(taskDocRef(id), task);
   modalTask.classList.add('hidden');
@@ -465,25 +502,39 @@ async function deleteTask(id) {
 
 function renderGantt() {
   const container = document.getElementById('gantt-container');
-  const dated = state.tasks.filter(t => t.startDate || t.endDate);
+  const mainTasks = state.tasks.filter(t => !t.parentId);
 
-  if (!dated.length) {
+  const ordered = [];
+  mainTasks.forEach(main => {
+    const subtasks = state.tasks.filter(t => t.parentId === main.id);
+    if (main.startDate || main.endDate) ordered.push({ task: main, isMain: true });
+    subtasks.forEach(st => {
+      if (st.startDate || st.endDate) ordered.push({ task: st, isMain: false });
+    });
+  });
+
+  if (!ordered.length) {
     container.innerHTML = '<div class="empty-state"><div class="icon">📅</div>Noch keine Aufgaben mit Daten vorhanden.</div>';
     return;
   }
 
-  const allDates = dated.flatMap(t => [t.startDate, t.endDate].filter(Boolean)).map(d => new Date(d));
+  const allDates = ordered
+    .flatMap(o => [o.task.startDate, o.task.endDate].filter(Boolean))
+    .map(d => new Date(d));
   const minDate = new Date(Math.min(...allDates));
   const maxDate = new Date(Math.max(...allDates));
   const totalMs = Math.max(maxDate - minDate, 1);
 
-  const rows = dated.map(t => {
+  const rows = ordered.map(o => {
+    const t = o.task;
     const s = t.startDate ? new Date(t.startDate) : minDate;
     const e = t.endDate ? new Date(t.endDate) : s;
     const left = ((s - minDate) / totalMs * 100).toFixed(1);
     const width = Math.max(((e - s) / totalMs * 100), 0.8).toFixed(1);
-    return '<tr>' +
-      '<td>' + (t.parentId ? ' ↳ ' : '') + escHtml(t.title) + '</td>' +
+    const rowClass = o.isMain ? 'gantt-main' : 'gantt-sub';
+
+    return '<tr class="' + rowClass + '">' +
+      '<td>' + (o.isMain ? '' : ' ↳ ') + escHtml(t.title) + '</td>' +
       '<td><span class="tag">' + (STATUS_LABEL[t.status]||t.status) + '</span></td>' +
       '<td>' + (t.startDate||'—') + '</td>' +
       '<td>' + (t.endDate||'—') + '</td>' +
@@ -507,21 +558,38 @@ function renderTodos() {
     return;
   }
 
+  const active = todos.filter(t => !t.done).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  const done = todos.filter(t => t.done).sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
+
   const today = new Date().toISOString().split('T')[0];
-  container.innerHTML = todos.map(td => {
+
+  const renderItem = td => {
     const overdue = td.dueDate && td.dueDate < today && !td.done;
-    return '<div class="todo-item" data-id="' + td.id + '">' +
+    return '<div class="todo-item ' + (td.done ? 'is-done' : '') + '" data-id="' + td.id + '">' +
       '<div class="todo-check ' + (td.done ? 'checked' : '') + '" data-action="toggle-todo" data-id="' + td.id + '"></div>' +
       '<div class="todo-content">' +
       '<div class="todo-title ' + (td.done ? 'done-text' : '') + '">' + escHtml(td.title) + '</div>' +
       (td.dueDate ? '<div class="todo-due ' + (overdue ? 'overdue' : '') + '">📅 Fällig: ' + td.dueDate + (overdue ? ' ⚠️ Überfällig' : '') + '</div>' : '') +
+      (td.done && td.completedAt ? '<div class="todo-completed">✅ Erledigt am: ' + td.completedAt + '</div>' : '') +
       (td.note ? '<div class="todo-note">' + escHtml(td.note) + '</div>' : '') +
       '</div>' +
       '<div class="task-actions">' +
       '<button class="icon-btn" data-action="edit-todo" data-id="' + td.id + '" title="Bearbeiten">✏️</button>' +
       '<button class="icon-btn delete" data-action="delete-todo" data-id="' + td.id + '" title="Löschen">🗑️</button>' +
       '</div></div>';
-  }).join('');
+  };
+
+  let html = '';
+  if (active.length) {
+    html += '<div class="todo-section-label">Aktiv (' + active.length + ')</div>';
+    html += active.map(renderItem).join('');
+  }
+  if (done.length) {
+    html += '<div class="todo-section-label">Erledigt (' + done.length + ')</div>';
+    html += done.map(renderItem).join('');
+  }
+
+  container.innerHTML = html;
 
   container.querySelectorAll('[data-action]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -567,6 +635,7 @@ async function saveTodo() {
     dueDate: document.getElementById('td-due').value || null,
     note: document.getElementById('td-note').value.trim() || null,
     done: (existing && existing.done) || false,
+    completedAt: (existing && existing.completedAt) || null,
     createdAt: (existing && existing.createdAt) || Date.now()
   };
 
@@ -578,7 +647,14 @@ async function toggleTodo(id) {
   if (!state.user) return;
   const todo = state.todos.find(t => t.id === id);
   if (!todo) return;
-  await setDoc(todoDocRef(id), Object.assign({}, todo, { done: !todo.done }), { merge: true });
+
+  const nowDone = !todo.done;
+  const update = {
+    done: nowDone,
+    completedAt: nowDone ? new Date().toISOString().split('T')[0] : null
+  };
+
+  await setDoc(todoDocRef(id), Object.assign({}, todo, update), { merge: true });
 }
 
 async function deleteTodo(id) {
