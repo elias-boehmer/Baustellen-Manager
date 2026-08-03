@@ -61,7 +61,8 @@ const authTitle = document.getElementById('auth-title');
 const authSub = document.getElementById('auth-sub');
 const btnAuthSubmit = document.getElementById('btn-auth-submit');
 const linkForgot = document.getElementById('link-forgot');
-const linkToggleMode = document.getElementById('link-toggle-mode');
+const linkToggleMode = document.getElementById('link-toggle-mode') || null;
+
 const appDiv = document.getElementById('app');
 
 const sidebar = document.getElementById('sidebar');
@@ -73,7 +74,8 @@ const modalPin = document.getElementById('modal-pin');
 
 loginForm.addEventListener('submit', handleAuthSubmit);
 linkForgot.addEventListener('click', handleForgotPassword);
-linkToggleMode.addEventListener('click', toggleAuthMode);
+// Registrierung vorübergehend deaktiviert
+// linkToggleMode.addEventListener('click', toggleAuthMode);
 
 document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
 document.getElementById('btn-logout-sidebar').addEventListener('click', () => signOut(auth));
@@ -170,11 +172,8 @@ async function handleAuthSubmit(e) {
   try {
     await setPersistence(auth, browserLocalPersistence);
 
-    if (state.authMode === 'register') {
-      await createUserWithEmailAndPassword(auth, email, password);
-    } else {
-      await signInWithEmailAndPassword(auth, email, password);
-    }
+    // Registrierung vorübergehend deaktiviert – es wird immer nur angemeldet
+await signInWithEmailAndPassword(auth, email, password);
   } catch (error) {
     loginError.textContent = mapAuthError(error);
     loginError.classList.remove('hidden');
