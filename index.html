@@ -12,14 +12,22 @@
     <div class="login-background"></div>
     <div class="login-box">
       <div class="login-logo">🏗️</div>
-      <h1>Baustellen-Tracker</h1>
-      <p class="login-sub">Bitte mit deiner E-Mail-Adresse und deinem Passwort anmelden.</p>
+      <h1 id="auth-title">Baustellen-Tracker</h1>
+      <p class="login-sub" id="auth-sub">Bitte mit deiner E-Mail-Adresse und deinem Passwort anmelden.</p>
+
       <form id="login-form" autocomplete="on">
         <input id="login-email" type="email" placeholder="E-Mail-Adresse" autocomplete="username" />
         <input id="login-password" type="password" placeholder="Passwort" autocomplete="current-password" />
         <div id="login-error" class="login-error hidden"></div>
-        <button type="submit" class="btn-primary login-btn">Anmelden</button>
+        <div id="login-success" class="login-success hidden"></div>
+        <button type="submit" class="btn-primary login-btn" id="btn-auth-submit">Anmelden</button>
       </form>
+
+      <div class="login-links">
+        <a href="#" id="link-forgot">Passwort vergessen?</a>
+        <a href="#" id="link-toggle-mode">Noch kein Konto? Registrieren</a>
+      </div>
+
       <p class="login-hint">Die Daten werden zentral über Firebase synchronisiert.</p>
     </div>
   </div>
@@ -41,6 +49,7 @@
         <li><a href="#" class="nav-link" data-page="current">✅ Aktuell</a></li>
       </ul>
       <div class="sidebar-footer">
+        <button class="btn-logout-sidebar" id="btn-change-password">🔑 Passwort ändern</button>
         <button class="btn-logout-sidebar" id="btn-logout-sidebar">🔓 Abmelden</button>
       </div>
     </nav>
@@ -108,6 +117,20 @@
       <div class="modal-actions">
         <button class="btn-secondary" id="btn-cancel-todo">Abbrechen</button>
         <button class="btn-primary" id="btn-save-todo">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-pin" class="modal hidden">
+    <div class="modal-box">
+      <h2>🔑 Passwort ändern</h2>
+      <label>Aktuelles Passwort<input id="pin-current" type="password" /></label>
+      <label>Neues Passwort<input id="pin-new" type="password" /></label>
+      <label>Neues Passwort bestätigen<input id="pin-confirm" type="password" /></label>
+      <div id="pin-error" class="login-error hidden"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="btn-cancel-pin">Abbrechen</button>
+        <button class="btn-primary" id="btn-save-pin">Speichern</button>
       </div>
     </div>
   </div>

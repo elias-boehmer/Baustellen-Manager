@@ -6,6 +6,11 @@ import {
   setPersistence,
   browserLocalPersistence,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
@@ -35,7 +40,8 @@ const state = {
   user: null,
   tasks: [],
   todos: [],
-  unsubs: []
+  unsubs: [],
+  authMode: 'login' // 'login' | 'register'
 };
 
 const STATUS_LABEL = {
@@ -50,6 +56,12 @@ const loginForm = document.getElementById('login-form');
 const loginEmail = document.getElementById('login-email');
 const loginPassword = document.getElementById('login-password');
 const loginError = document.getElementById('login-error');
+const loginSuccess = document.getElementById('login-success');
+const authTitle = document.getElementById('auth-title');
+const authSub = document.getElementById('auth-sub');
+const btnAuthSubmit = document.getElementById('btn-auth-submit');
+const linkForgot = document.getElementById('link-forgot');
+const linkToggleMode = document.getElementById('link-toggle-mode');
 const appDiv = document.getElementById('app');
 
 const sidebar = document.getElementById('sidebar');
@@ -57,8 +69,12 @@ const overlay = document.getElementById('sidebar-overlay');
 
 const modalTask = document.getElementById('modal-task');
 const modalTodo = document.getElementById('modal-todo');
+const modalPin = document.getElementById('modal-pin');
 
-loginForm.addEventListener('submit', handleLogin);
+loginForm.addEventListener('submit', handleAuthSubmit);
+linkForgot.addEventListener('click', handleForgotPassword);
+linkToggleMode.addEventListener('click', toggleAuthMode);
+
 document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
 document.getElementById('btn-logout-sidebar').addEventListener('click', () => signOut(auth));
 document.getElementById('hamburger').addEventListener('click', toggleSidebar);
@@ -92,6 +108,15 @@ document.getElementById('btn-cancel-todo').addEventListener('click', () => modal
 modalTodo.addEventListener('click', e => { if (e.target === modalTodo) modalTodo.classList.add('hidden'); });
 document.getElementById('btn-save-todo').addEventListener('click', saveTodo);
 
+document.getElementById('btn-change-password').addEventListener('click', () => {
+  ['pin-current','pin-new','pin-confirm'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('pin-error').classList.add('hidden');
+  modalPin.classList.remove('hidden');
+});
+document.getElementById('btn-cancel-pin').addEventListener('click', () => modalPin.classList.add('hidden'));
+modalPin.addEventListener('click', e => { if (e.target === modalPin) modalPin.classList.add('hidden'); });
+document.getElementById('btn-save-pin').addEventListener('click', handleChangePassword);
+
 onAuthStateChanged(auth, user => {
   clearSubscriptions();
   state.user = user || null;
@@ -104,25 +129,106 @@ onAuthStateChanged(auth, user => {
   }
 });
 
-async function handleLogin(e) {
+function toggleAuthMode(e) {
+  e.preventDefault();
+  state.authMode = state.authMode === 'login' ? 'register' : 'login';
+  clearMessages();
+
+  if (state.authMode === 'register') {
+    authTitle.textContent = 'Konto erstellen';
+    authSub.textContent = 'Registriere dich mit E-Mail-Adresse und Passwort.';
+    btnAuthSubmit.textContent = 'Registrieren';
+    linkToggleMode.textContent = 'Schon ein Konto? Anmelden';
+  } else {
+    authTitle.textContent = 'Baustellen-Tracker';
+    authSub.textContent = 'Bitte mit deiner E-Mail-Adresse und deinem Passwort anmelden.';
+    btnAuthSubmit.textContent = 'Anmelden';
+    linkToggleMode.textContent = 'Noch kein Konto? Registrieren';
+  }
+}
+
+async function handleAuthSubmit(e) {
   e.preventDefault();
   const email = loginEmail.value.trim();
   const password = loginPassword.value;
 
-  loginError.classList.add('hidden');
-  loginError.textContent = '';
-
+  clearMessages();
   if (!email || !password) return;
 
   try {
     await setPersistence(auth, browserLocalPersistence);
-    await signInWithEmailAndPassword(auth, email, password);
+
+    if (state.authMode === 'register') {
+      await createUserWithEmailAndPassword(auth, email, password);
+    } else {
+      await signInWithEmailAndPassword(auth, email, password);
+    }
   } catch (error) {
     loginError.textContent = mapAuthError(error);
     loginError.classList.remove('hidden');
     loginPassword.value = '';
     loginPassword.focus();
   }
+}
+
+async function handleForgotPassword(e) {
+  e.preventDefault();
+  clearMessages();
+
+  const email = loginEmail.value.trim();
+  if (!email) {
+    loginError.textContent = '❌ Bitte zuerst deine E-Mail-Adresse eingeben.';
+    loginError.classList.remove('hidden');
+    loginEmail.focus();
+    return;
+  }
+
+  try {
+    await sendPasswordResetEmail(auth, email);
+    loginSuccess.textContent = '✅ E-Mail zum Zurücksetzen wurde an ' + email + ' gesendet.';
+    loginSuccess.classList.remove('hidden');
+  } catch (error) {
+    loginError.textContent = mapAuthError(error);
+    loginError.classList.remove('hidden');
+  }
+}
+
+async function handleChangePassword() {
+  const current = document.getElementById('pin-current').value;
+  const nw = document.getElementById('pin-new').value.trim();
+  const cf = document.getElementById('pin-confirm').value.trim();
+  const errEl = document.getElementById('pin-error');
+
+  errEl.classList.add('hidden');
+
+  if (!nw || nw.length < 6) {
+    errEl.textContent = '❌ Neues Passwort muss mind. 6 Zeichen haben.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (nw !== cf) {
+    errEl.textContent = '❌ Passwörter stimmen nicht überein.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const credential = EmailAuthProvider.credential(state.user.email, current);
+    await reauthenticateWithCredential(state.user, credential);
+    await updatePassword(state.user, nw);
+    modalPin.classList.add('hidden');
+    alert('✅ Passwort erfolgreich geändert!');
+  } catch (error) {
+    errEl.textContent = mapAuthError(error);
+    errEl.classList.remove('hidden');
+  }
+}
+
+function clearMessages() {
+  loginError.classList.add('hidden');
+  loginError.textContent = '';
+  loginSuccess.classList.add('hidden');
+  loginSuccess.textContent = '';
 }
 
 function showLogin() {
@@ -138,7 +244,7 @@ function showLogin() {
 function showApp() {
   loginScreen.classList.add('hidden');
   appDiv.classList.remove('hidden');
-  loginError.classList.add('hidden');
+  clearMessages();
   loginPassword.value = '';
 }
 
@@ -190,8 +296,11 @@ function mapAuthError(error) {
   const code = (error && error.code) || '';
   if (code.includes('invalid-credential')) return '❌ E-Mail oder Passwort ist falsch.';
   if (code.includes('invalid-email')) return '❌ Die E-Mail-Adresse ist ungültig.';
+  if (code.includes('email-already-in-use')) return '❌ Diese E-Mail-Adresse wird bereits verwendet.';
+  if (code.includes('weak-password')) return '❌ Das Passwort muss mind. 6 Zeichen haben.';
   if (code.includes('too-many-requests')) return '❌ Zu viele Versuche. Bitte kurz warten.';
-  return '❌ Anmeldung fehlgeschlagen.';
+  if (code.includes('user-not-found')) return '❌ Kein Konto mit dieser E-Mail-Adresse gefunden.';
+  return '❌ Vorgang fehlgeschlagen. Bitte erneut versuchen.';
 }
 
 function taskDocRef(id) {

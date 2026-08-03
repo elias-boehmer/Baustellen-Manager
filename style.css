@@ -90,7 +90,28 @@ body {
   padding: 8px 12px;
   font-size: 0.85rem;
 }
+.login-success {
+  background: rgba(34,197,94,0.15);
+  border: 1px solid var(--done);
+  color: var(--done);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
 .login-hint { color: var(--text-muted); font-size: 0.75rem; }
+
+.login-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.82rem;
+}
+.login-links a {
+  color: var(--accent2);
+  text-decoration: none;
+  cursor: pointer;
+}
+.login-links a:hover { text-decoration: underline; }
 
 #app { display: flex; min-height: 100vh; }
 #app.hidden { display: none !important; }
@@ -182,7 +203,7 @@ body {
   text-align: left;
   transition: background 0.15s, color 0.15s;
 }
-.btn-logout-sidebar:hover { color: var(--blocked); background: rgba(239,68,68,0.08); border-color: var(--blocked); }
+.btn-logout-sidebar:hover { color: var(--accent); background: var(--surface2); }
 
 .sidebar-overlay {
   position: fixed;
