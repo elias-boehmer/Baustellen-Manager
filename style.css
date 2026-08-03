@@ -25,10 +25,8 @@ body {
   min-height: 100vh;
 }
 
-/* ---- UTILS ---- */
 .hidden { display: none !important; }
 
-/* ---- LOGIN ---- */
 #login-screen {
   min-height: 100vh;
   display: flex;
@@ -66,8 +64,9 @@ body {
 .login-logo { font-size: 2.8rem; }
 .login-box h1 { font-size: 1.5rem; font-weight: 700; }
 .login-sub { color: var(--text-muted); font-size: 0.9rem; }
+
 #login-form { display: flex; flex-direction: column; gap: 10px; }
-#login-password {
+#login-form input {
   background: var(--surface2);
   border: 1px solid var(--border);
   color: var(--text);
@@ -80,7 +79,8 @@ body {
   -webkit-appearance: none;
   appearance: none;
 }
-#login-password:focus { border-color: var(--accent); }
+#login-form input:focus { border-color: var(--accent); }
+
 .login-btn { width: 100%; padding: 12px; font-size: 1rem; }
 .login-error {
   background: rgba(239,68,68,0.15);
@@ -92,14 +92,9 @@ body {
 }
 .login-hint { color: var(--text-muted); font-size: 0.75rem; }
 
-/* ---- APP SHELL ---- */
-#app {
-  display: flex;
-  min-height: 100vh;
-}
+#app { display: flex; min-height: 100vh; }
 #app.hidden { display: none !important; }
 
-/* ---- TOPBAR (mobile only) ---- */
 .topbar {
   display: none;
   height: var(--topbar-h);
@@ -127,7 +122,6 @@ body {
 }
 .btn-logout:hover { color: var(--blocked); background: var(--surface2); }
 
-/* ---- SIDEBAR ---- */
 .sidebar {
   width: var(--sidebar-w);
   min-height: 100vh;
@@ -177,7 +171,7 @@ body {
   margin-top: auto;
   border-top: 1px solid var(--border);
 }
-.btn-logout-sidebar, .btn-change-pin {
+.btn-logout-sidebar {
   background: none;
   border: 1px solid var(--border);
   color: var(--text-muted);
@@ -189,10 +183,8 @@ body {
   transition: background 0.15s, color 0.15s;
 }
 .btn-logout-sidebar:hover { color: var(--blocked); background: rgba(239,68,68,0.08); border-color: var(--blocked); }
-.btn-change-pin:hover { color: var(--accent); background: var(--surface2); }
 
 .sidebar-overlay {
-  display: none;
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.55);
@@ -200,7 +192,6 @@ body {
 }
 .sidebar-overlay.visible { display: block; }
 
-/* ---- CONTENT ---- */
 .content {
   margin-left: var(--sidebar-w);
   flex: 1;
@@ -220,7 +211,6 @@ body {
 }
 .page-header h1 { font-size: 1.5rem; font-weight: 700; }
 
-/* ---- BUTTONS ---- */
 .btn-primary {
   background: var(--accent); color: #000; border: none;
   padding: 9px 18px; border-radius: var(--radius);
@@ -236,7 +226,6 @@ body {
 }
 .btn-secondary:hover { background: var(--border); }
 
-/* ---- TASK CARDS ---- */
 .task-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -318,7 +307,6 @@ body {
 }
 .add-subtask-btn:hover { background: var(--surface); }
 
-/* ---- GANTT ---- */
 .gantt-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .gantt-table {
   width: 100%; border-collapse: collapse;
@@ -346,7 +334,6 @@ body {
 .gantt-bar.inprogress { background: var(--inprogress); }
 .gantt-bar.done { background: var(--done); }
 
-/* ---- TODOS ---- */
 .todo-item {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -369,7 +356,6 @@ body {
 .todo-due.overdue { color: var(--blocked); }
 .todo-note { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; word-break: break-word; }
 
-/* ---- MODALS ---- */
 .modal {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.65);
@@ -411,7 +397,6 @@ body {
 }
 .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
 
-/* ---- MOBILE ---- */
 @media (max-width: 768px) {
   .topbar { display: flex; }
 
