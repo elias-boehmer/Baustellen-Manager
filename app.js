@@ -373,7 +373,7 @@ function getFilteredMainTasks() {
   const statusFilter = document.getElementById('filter-status').value;
   const ownerFilter = document.getElementById('filter-owner').value;
 
-  return state.tasks.filter(t => !t.parentId).filter(t => {
+  const filtered = state.tasks.filter(t => !t.parentId).filter(t => {
     const subtasks = state.tasks.filter(s => s.parentId === t.id);
     const haystacks = [t, ...subtasks];
 
@@ -389,12 +389,18 @@ function getFilteredMainTasks() {
 
     return matchesQuery && matchesStatus && matchesOwner;
   });
+
+  return filtered.sort((a, b) => (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0));
 }
 
 function renderTasks() {
   const container = document.getElementById('task-list');
   populateOwnerFilter();
   const tasks = getFilteredMainTasks();
+  const filterActive =
+    document.getElementById('search-input').value.trim() !== '' ||
+    document.getElementById('filter-status').value !== 'all' ||
+    document.getElementById('filter-owner').value !== 'all';
 
   if (!tasks.length) {
     container.innerHTML = '<div class="empty-state"><div class="icon">📋</div>Keine Aufgaben gefunden. Passe ggf. Suche/Filter an oder lege eine neue Aufgabe an!</div>';
@@ -403,6 +409,11 @@ function renderTasks() {
 
   container.innerHTML = tasks.map(taskCardHTML).join('');
   bindTaskEvents();
+
+  container.querySelectorAll('.task-card').forEach(card => {
+    card.setAttribute('draggable', filterActive ? 'false' : 'true');
+    card.classList.toggle('draggable-mode', !filterActive);
+  });
 }
 
 function taskCardHTML(task) {
@@ -434,8 +445,9 @@ function taskCardHTML(task) {
   const attachmentHTML = task.attachmentUrl
     ? '<div class="task-attachment"><a href="' + escHtml(task.attachmentUrl) + '" target="_blank" rel="noopener">📎 Anhang öffnen</a></div>' : '';
 
-  return '<div class="task-card" data-id="' + task.id + '">' +
+  return '<div class="task-card" data-id="' + task.id + '" draggable="true">' +
     '<div class="task-header">' +
+    '<span class="drag-handle" title="Ziehen zum Sortieren">⠿</span>' +
     '<span class="task-toggle ' + (hasSubs ? '' : 'invisible') + '">▶</span>' +
     '<div class="status-dot ' + task.status + '"></div>' +
     '<span class="task-title" data-action="edit" data-id="' + task.id + '">' + escHtml(task.title) + '</span>' +
@@ -467,6 +479,7 @@ function bindTaskEvents() {
     header.addEventListener('click', e => {
       if (e.target.closest('.task-actions')) return;
       if (e.target.closest('.task-title')) return;
+      if (e.target.closest('.drag-handle')) return;
       const card = header.closest('.task-card');
       const body = card.querySelector('.task-body');
       const toggle = header.querySelector('.task-toggle');
@@ -483,6 +496,56 @@ function bindTaskEvents() {
       else if (action === 'add-sub') openTaskModal(null, id);
     });
   });
+  bindDragEvents();
+}
+
+function bindDragEvents() {
+  const container = document.getElementById('task-list');
+  let dragSrc = null;
+
+  container.querySelectorAll('.task-card').forEach(card => {
+    card.addEventListener('dragstart', e => {
+      dragSrc = card;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      container.querySelectorAll('.task-card').forEach(c => c.classList.remove('drag-over'));
+    });
+
+    card.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (card === dragSrc) return;
+      container.querySelectorAll('.task-card').forEach(c => c.classList.remove('drag-over'));
+      card.classList.add('drag-over');
+    });
+
+    card.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!dragSrc || card === dragSrc) return;
+
+      const rect = card.getBoundingClientRect();
+      const before = e.clientY < rect.top + rect.height / 2;
+      container.insertBefore(dragSrc, before ? card : card.nextSibling);
+
+      card.classList.remove('drag-over');
+      persistNewOrder();
+    });
+  });
+}
+
+async function persistNewOrder() {
+  const cards = [...document.querySelectorAll('#task-list .task-card')];
+  const updates = cards.map((card, index) => {
+    const id = card.dataset.id;
+    const task = state.tasks.find(t => t.id === id);
+    if (!task) return null;
+    return setDoc(taskDocRef(id), Object.assign({}, task, { order: index }), { merge: true });
+  }).filter(Boolean);
+
+  await Promise.all(updates);
 }
 
 function openTaskModal(id, parentId) {
@@ -557,6 +620,7 @@ async function saveTask() {
     parentId: document.getElementById('ti-parent').value || null,
     title,
     status: newStatus,
+    order: (existing && existing.order !== undefined) ? existing.order : state.tasks.filter(t => !t.parentId).length,
     startDate: document.getElementById('ti-start').value || null,
     endDate: document.getElementById('ti-end').value || null,
     budget: document.getElementById('ti-budget').value || null,
