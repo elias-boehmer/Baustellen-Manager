@@ -699,7 +699,9 @@ async function deleteTask(id) {
 
 function renderGantt() {
   const container = document.getElementById('gantt-container');
-  const mainTasks = state.tasks.filter(t => !t.parentId);
+  const mainTasks = state.tasks
+    .filter(t => !t.parentId)
+    .sort((a, b) => (a.order ?? a.createdAt ?? 0) - (b.order ?? b.createdAt ?? 0));
 
   const ordered = [];
   mainTasks.forEach(main => {
