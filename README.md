@@ -1,4 +1,4 @@
-# 🏗️ Baustellen-Tracker
+# 🏗️ Baustellen-Manager
 
 Eine einfache, lokale Web-App zum Tracken deines Baustellenfortschritts — direkt über GitHub Pages.
 
