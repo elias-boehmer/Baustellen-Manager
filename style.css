@@ -317,11 +317,6 @@ body {
 .todo-completed { font-size: 0.8rem; color: var(--done); margin-top: 3px; }
 .todo-note { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; word-break: break-word; }
 
-.hr-total-preview {
-  font-size: 0.95rem; font-weight: 600; color: var(--accent2);
-  margin: 6px 0 14px; padding: 8px 12px; background: var(--surface2);
-  border-radius: var(--radius);
-}
 .hours-group { margin-bottom: 22px; }
 .hours-group-header {
   display: flex; justify-content: space-between; align-items: center;
