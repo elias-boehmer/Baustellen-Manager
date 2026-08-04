@@ -180,19 +180,14 @@
       <label>Datum
         <input id="hr-date" type="date" autocomplete="off">
       </label>
-      <div class="row-2">
-        <label>Beginn<input id="hr-start" type="time" autocomplete="off"></label>
-        <label>Ende<input id="hr-end" type="time" autocomplete="off"></label>
-      </div>
-      <label>Pause (Minuten)
-        <input id="hr-break" type="number" min="0" step="5" placeholder="z.B. 30" autocomplete="off">
+      <label>Gesamtstunden
+        <input id="hr-total" type="number" min="0" step="0.25" placeholder="z.B. 8" autocomplete="off">
       </label>
       <label>Verknüpfte Aufgabe (optional)
         <select id="hr-task" autocomplete="off">
           <option value="">– Keine –</option>
         </select>
       </label>
-      <div id="hr-total-preview" class="hr-total-preview">Gesamtstunden: 0,0 Std</div>
       <input type="hidden" id="hr-id">
       <div class="modal-actions">
         <button class="btn-secondary" id="btn-cancel-hours">Abbrechen</button>
