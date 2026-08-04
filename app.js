@@ -130,6 +130,7 @@ document.getElementById('btn-change-password').addEventListener('click', () => {
   ['pin-current','pin-new','pin-confirm'].forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('pin-error').classList.add('hidden');
   modalPin.classList.remove('hidden');
+  bindEnterToSave(modalPin, handleChangePassword);
 });
 document.getElementById('btn-cancel-pin').addEventListener('click', () => modalPin.classList.add('hidden'));
 modalPin.addEventListener('click', e => { if (e.target === modalPin) modalPin.classList.add('hidden'); });
@@ -181,6 +182,21 @@ function initDatePickers() {
       disableMobile: true
     });
   });
+}
+
+function bindEnterToSave(modalEl, saveFn) {
+  if (modalEl._enterHandler) {
+    modalEl.removeEventListener('keydown', modalEl._enterHandler);
+  }
+  const handler = e => {
+    if (e.key !== 'Enter') return;
+    if (e.target.tagName === 'TEXTAREA') return;
+    if (e.target.tagName === 'BUTTON') return;
+    e.preventDefault();
+    saveFn();
+  };
+  modalEl._enterHandler = handler;
+  modalEl.addEventListener('keydown', handler);
 }
 
 async function handleAuthSubmit(e) {
@@ -609,6 +625,7 @@ function openTaskModal(id, parentId) {
 
   modalTask.classList.remove('hidden');
   initDatePickers();
+  bindEnterToSave(modalTask, saveTask);
   if (IS_DESKTOP) document.getElementById('ti-title').focus();
 }
 
@@ -815,6 +832,7 @@ function openTodoModal(id) {
 
   modalTodo.classList.remove('hidden');
   initDatePickers();
+  bindEnterToSave(modalTodo, saveTodo);
   if (IS_DESKTOP) document.getElementById('td-title').focus();
 }
 
@@ -965,6 +983,7 @@ function openHoursModal(id) {
 
   modalHours.classList.remove('hidden');
   initDatePickers();
+  bindEnterToSave(modalHours, saveHoursEntry);
   if (IS_DESKTOP) document.getElementById('hr-worker').focus();
 }
 
