@@ -79,6 +79,19 @@
         </div>
         <div id="todo-list"></div>
       </section>
+      <div class="filter-bar" id="filter-bar">
+  <input id="search-input" type="text" placeholder="🔍 Suche nach Titel, Notiz, Verantwortlichem …" autocomplete="off">
+  <select id="filter-status">
+    <option value="all">Alle Status</option>
+    <option value="pending">⏳ Start ausstehend</option>
+    <option value="blocked">🚫 Blockiert</option>
+    <option value="inprogress">🔄 In Bearbeitung</option>
+    <option value="done">✅ Erledigt</option>
+  </select>
+  <select id="filter-owner">
+    <option value="all">Alle Verantwortlichen</option>
+  </select>
+</div>
     </main>
   </div>
 
@@ -102,6 +115,13 @@
       <label>Hinweis<textarea id="ti-note" rows="3" placeholder="Notizen, Details ..."></textarea></label>
       <label>Link<input id="ti-link" type="url" placeholder="https://" /></label>
       <label>Datei (Name/Pfad)<input id="ti-file" type="text" placeholder="z.B. Angebot_Dachdecker.pdf" /></label>
+      <label>Verantwortlicher
+      <input id="ti-owner" type="text" placeholder="z.B. Elektriker Müller" autocomplete="off">
+      </label>
+      <label>Anhang (Foto/Datei)
+      <input id="ti-file-upload" type="file" accept="image/*,.pdf" autocomplete="off">
+      <div id="ti-file-list" style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;"></div>
+      </label>
       <input type="hidden" id="ti-id" />
       <input type="hidden" id="ti-parent" />
       <div class="modal-actions">
@@ -129,8 +149,8 @@
     <div class="modal-box">
       <h2>🔑 Passwort ändern</h2>
       <label>Aktuelles Passwort<input id="pin-current" type="password" /></label>
-      <label>Neues Passwort<input id="pin-new" type="password" /></label>
-      <label>Neues Passwort bestätigen<input id="pin-confirm" type="password" /></label>
+      <label>Neues Passwort<input id="pin-new" type="password" autocomplete="new-password" /></label>
+      <label>Neues Passwort bestätigen<input id="pin-confirm" type="password" autocomplete="new-password" /></label>
       <div id="pin-error" class="login-error hidden"></div>
       <div class="modal-actions">
         <button class="btn-secondary" id="btn-cancel-pin">Abbrechen</button>
