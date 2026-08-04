@@ -47,6 +47,7 @@ const state = {
   user: null,
   tasks: [],
   todos: [],
+  hours: [],
   unsubs: [],
   authMode: 'login'
 };
@@ -77,12 +78,11 @@ const overlay = document.getElementById('sidebar-overlay');
 
 const modalTask = document.getElementById('modal-task');
 const modalTodo = document.getElementById('modal-todo');
+const modalHours = document.getElementById('modal-hours');
 const modalPin = document.getElementById('modal-pin');
 
 loginForm.addEventListener('submit', handleAuthSubmit);
 linkForgot.addEventListener('click', handleForgotPassword);
-// Registrierung vorübergehend deaktiviert
-// linkToggleMode.addEventListener('click', toggleAuthMode);
 
 document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
 document.getElementById('btn-logout-sidebar').addEventListener('click', () => signOut(auth));
@@ -104,6 +104,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
 
     if (page === 'calendar') renderGantt();
     else if (page === 'current') renderTodos();
+    else if (page === 'hours') renderHours();
     else { renderStats(); renderTasks(); }
   });
 });
@@ -117,6 +118,15 @@ document.getElementById('btn-add-todo').addEventListener('click', () => openTodo
 document.getElementById('btn-cancel-todo').addEventListener('click', () => modalTodo.classList.add('hidden'));
 modalTodo.addEventListener('click', e => { if (e.target === modalTodo) modalTodo.classList.add('hidden'); });
 document.getElementById('btn-save-todo').addEventListener('click', saveTodo);
+
+document.getElementById('btn-add-hours').addEventListener('click', () => openHoursModal());
+document.getElementById('btn-cancel-hours').addEventListener('click', () => modalHours.classList.add('hidden'));
+modalHours.addEventListener('click', e => { if (e.target === modalHours) modalHours.classList.add('hidden'); });
+document.getElementById('btn-save-hours').addEventListener('click', saveHoursEntry);
+document.getElementById('hours-filter-worker').addEventListener('change', () => renderHours());
+['hr-start','hr-end','hr-break'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateHoursPreview);
+});
 
 document.getElementById('btn-change-password').addEventListener('click', () => {
   ['pin-current','pin-new','pin-confirm'].forEach(id => { document.getElementById(id).value = ''; });
@@ -151,24 +161,6 @@ function toggleTheme() {
   } else {
     document.documentElement.setAttribute('data-theme', 'light');
     localStorage.setItem('bt-theme', 'light');
-  }
-}
-
-function toggleAuthMode(e) {
-  e.preventDefault();
-  state.authMode = state.authMode === 'login' ? 'register' : 'login';
-  clearMessages();
-
-  if (state.authMode === 'register') {
-    authTitle.textContent = 'Konto erstellen';
-    authSub.textContent = 'Registriere dich mit E-Mail-Adresse und Passwort.';
-    btnAuthSubmit.textContent = 'Registrieren';
-    linkToggleMode.textContent = 'Schon ein Konto? Anmelden';
-  } else {
-    authTitle.textContent = 'Baustellen-Tracker';
-    authSub.textContent = 'Bitte mit deiner E-Mail-Adresse und deinem Passwort anmelden.';
-    btnAuthSubmit.textContent = 'Anmelden';
-    linkToggleMode.textContent = 'Noch kein Konto? Registrieren';
   }
 }
 
@@ -256,10 +248,12 @@ function showLogin() {
   appDiv.classList.add('hidden');
   state.tasks = [];
   state.todos = [];
+  state.hours = [];
   renderStats();
   renderTasks();
   renderTodos();
   renderGantt();
+  renderHours();
 }
 
 function showApp() {
@@ -286,7 +280,14 @@ function startLiveSync(uid) {
     renderTodos();
   });
 
-  state.unsubs = [tasksUnsub, todosUnsub];
+  const hoursUnsub = onSnapshot(collection(db, 'users', uid, 'hours'), snap => {
+    state.hours = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    renderHours();
+  });
+
+  state.unsubs = [tasksUnsub, todosUnsub, hoursUnsub];
 }
 
 function clearSubscriptions() {
@@ -331,6 +332,10 @@ function taskDocRef(id) {
 
 function todoDocRef(id) {
   return doc(db, 'users', state.user.uid, 'todos', id);
+}
+
+function hoursDocRef(id) {
+  return doc(db, 'users', state.user.uid, 'hours', id);
 }
 
 function renderStats() {
@@ -824,4 +829,172 @@ async function toggleTodo(id) {
 async function deleteTodo(id) {
   if (!state.user || !confirm('To-Do löschen?')) return;
   await deleteDoc(todoDocRef(id));
+}
+
+function calcHours(start, end, breakMin) {
+  if (!start || !end) return 0;
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  let diffMin = (eh * 60 + em) - (sh * 60 + sm);
+  if (diffMin < 0) diffMin += 24 * 60;
+  diffMin -= (parseInt(breakMin) || 0);
+  return Math.max(diffMin, 0) / 60;
+}
+
+function updateHoursPreview() {
+  const start = document.getElementById('hr-start').value;
+  const end = document.getElementById('hr-end').value;
+  const brk = document.getElementById('hr-break').value;
+  const total = calcHours(start, end, brk);
+  document.getElementById('hr-total-preview').textContent =
+    'Gesamtstunden: ' + total.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + ' Std';
+}
+
+function populateHoursWorkerFilter() {
+  const sel = document.getElementById('hours-filter-worker');
+  const current = sel.value;
+  const workers = [...new Set(state.hours.map(h => h.worker).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="all">Alle Helfer</option>' +
+    workers.map(w => '<option value="' + escHtml(w) + '">' + escHtml(w) + '</option>').join('');
+  if (workers.includes(current)) sel.value = current;
+
+  const datalist = document.getElementById('hr-worker-list');
+  datalist.innerHTML = workers.map(w => '<option value="' + escHtml(w) + '">').join('');
+}
+
+function populateHoursTaskSelect() {
+  const sel = document.getElementById('hr-task');
+  const mainTasks = state.tasks.filter(t => !t.parentId);
+  sel.innerHTML = '<option value="">– Keine –</option>' +
+    mainTasks.map(t => '<option value="' + t.id + '">' + escHtml(t.title) + '</option>').join('');
+}
+
+function renderHours() {
+  const container = document.getElementById('hours-list');
+  populateHoursWorkerFilter();
+
+  const filterWorker = document.getElementById('hours-filter-worker').value;
+  const entries = state.hours.filter(h => filterWorker === 'all' || h.worker === filterWorker);
+
+  const bar = document.getElementById('hours-stats-bar');
+  const totalHours = entries.reduce((sum, h) => sum + (h.totalHours || 0), 0);
+  const uniqueWorkers = new Set(entries.map(h => h.worker)).size;
+  bar.innerHTML =
+    '<div class="stat-card stat-main"><span class="stat-label">Gesamtstunden</span><span class="stat-value">' +
+    totalHours.toLocaleString('de-DE', { minimumFractionDigits: 1 }) + ' Std</span></div>' +
+    '<div class="stat-card stat-sub"><span class="stat-label">Helfer</span><span class="stat-value">' + uniqueWorkers + '</span></div>';
+
+  if (!entries.length) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">🕒</div>Noch keine Stunden erfasst.</div>';
+    return;
+  }
+
+  const grouped = {};
+  entries.forEach(h => {
+    const key = h.worker || 'Unbekannt';
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(h);
+  });
+
+  const workerNames = Object.keys(grouped).sort();
+
+  container.innerHTML = workerNames.map(worker => {
+    const items = grouped[worker].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const subtotal = items.reduce((sum, h) => sum + (h.totalHours || 0), 0);
+
+    const itemsHTML = items.map(h => {
+      const task = state.tasks.find(t => t.id === h.taskId);
+      return '<div class="hours-card" data-id="' + h.id + '">' +
+        '<div class="hours-info">' +
+        '<div class="hours-meta">📅 ' + (h.date || '—') + ' · ⏰ ' + (h.start || '?') + ' – ' + (h.end || '?') +
+        (h.breakMin ? ' · ☕ ' + h.breakMin + ' Min Pause' : '') +
+        (task ? ' · 🔧 ' + escHtml(task.title) : '') + '</div>' +
+        '</div>' +
+        '<div class="hours-total">' + (h.totalHours || 0).toLocaleString('de-DE', { minimumFractionDigits: 1 }) + ' Std</div>' +
+        '<div class="task-actions">' +
+        '<button class="icon-btn" data-action="edit-hours" data-id="' + h.id + '" title="Bearbeiten">✏️</button>' +
+        '<button class="icon-btn delete" data-action="delete-hours" data-id="' + h.id + '" title="Löschen">🗑️</button>' +
+        '</div></div>';
+    }).join('');
+
+    return '<div class="hours-group">' +
+      '<div class="hours-group-header">' +
+      '<span class="hours-worker">👤 ' + escHtml(worker) + '</span>' +
+      '<span class="hours-subtotal">Σ ' + subtotal.toLocaleString('de-DE', { minimumFractionDigits: 1 }) + ' Std</span>' +
+      '</div>' +
+      itemsHTML +
+      '</div>';
+  }).join('');
+
+  container.querySelectorAll('[data-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { action, id } = btn.dataset;
+      if (action === 'edit-hours') openHoursModal(id);
+      else if (action === 'delete-hours') deleteHoursEntry(id);
+    });
+  });
+}
+
+function openHoursModal(id) {
+  id = id || null;
+  populateHoursTaskSelect();
+  document.getElementById('modal-hours-title').textContent = id ? 'Zeiteintrag bearbeiten' : 'Neuer Zeiteintrag';
+
+  if (id) {
+    const h = state.hours.find(h => h.id === id);
+    if (!h) return;
+    document.getElementById('hr-id').value = h.id;
+    document.getElementById('hr-worker').value = h.worker || '';
+    document.getElementById('hr-date').value = h.date || '';
+    document.getElementById('hr-start').value = h.start || '';
+    document.getElementById('hr-end').value = h.end || '';
+    document.getElementById('hr-break').value = h.breakMin || '';
+    document.getElementById('hr-task').value = h.taskId || '';
+  } else {
+    ['hr-id','hr-worker','hr-start','hr-end','hr-break'].forEach(i => { document.getElementById(i).value = ''; });
+    document.getElementById('hr-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('hr-task').value = '';
+  }
+
+  updateHoursPreview();
+  modalHours.classList.remove('hidden');
+  document.getElementById('hr-worker').focus();
+}
+
+async function saveHoursEntry() {
+  if (!state.user) return;
+
+  const worker = document.getElementById('hr-worker').value.trim();
+  const date = document.getElementById('hr-date').value;
+  const start = document.getElementById('hr-start').value;
+  const end = document.getElementById('hr-end').value;
+  const breakMin = parseInt(document.getElementById('hr-break').value) || 0;
+
+  if (!worker || !date || !start || !end) {
+    alert('Bitte Helfer, Datum, Beginn und Ende ausfüllen.');
+    return;
+  }
+
+  const id = document.getElementById('hr-id').value || uid();
+  const existing = state.hours.find(h => h.id === id);
+
+  const entry = {
+    id,
+    worker,
+    date,
+    start,
+    end,
+    breakMin,
+    totalHours: calcHours(start, end, breakMin),
+    taskId: document.getElementById('hr-task').value || null,
+    createdAt: (existing && existing.createdAt) || Date.now()
+  };
+
+  await setDoc(hoursDocRef(id), entry);
+  modalHours.classList.add('hidden');
+}
+
+async function deleteHoursEntry(id) {
+  if (!state.user || !confirm('Zeiteintrag löschen?')) return;
+  await deleteDoc(hoursDocRef(id));
 }
