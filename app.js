@@ -59,6 +59,8 @@ const STATUS_LABEL = {
   done: '✅ Erledigt'
 };
 
+const IS_DESKTOP = window.matchMedia('(min-width: 769px)').matches;
+
 const loginScreen = document.getElementById('login-screen');
 const loginForm = document.getElementById('login-form');
 const loginEmail = document.getElementById('login-email');
@@ -137,6 +139,13 @@ document.getElementById('search-input').addEventListener('input', () => renderTa
 document.getElementById('filter-status').addEventListener('change', () => renderTasks());
 document.getElementById('filter-owner').addEventListener('change', () => renderTasks());
 
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  [modalTask, modalTodo, modalHours, modalPin].forEach(m => {
+    if (!m.classList.contains('hidden')) m.classList.add('hidden');
+  });
+});
+
 onAuthStateChanged(auth, user => {
   clearSubscriptions();
   state.user = user || null;
@@ -158,6 +167,20 @@ function toggleTheme() {
     document.documentElement.setAttribute('data-theme', 'light');
     localStorage.setItem('bt-theme', 'light');
   }
+}
+
+function initDatePickers() {
+  if (!window.flatpickr) return;
+  if (flatpickr.l10ns && flatpickr.l10ns.de) flatpickr.localize(flatpickr.l10ns.de);
+  document.querySelectorAll('input[type="date"]').forEach(input => {
+    if (input._flatpickr) return;
+    flatpickr(input, {
+      dateFormat: 'Y-m-d',
+      altInput: true,
+      altFormat: 'd.m.Y',
+      disableMobile: true
+    });
+  });
 }
 
 async function handleAuthSubmit(e) {
@@ -258,6 +281,7 @@ function showApp() {
   clearMessages();
   loginPassword.value = '';
   renderTodos();
+  initDatePickers();
 }
 
 function startLiveSync(uid) {
@@ -584,7 +608,8 @@ function openTaskModal(id, parentId) {
   }
 
   modalTask.classList.remove('hidden');
-  document.getElementById('ti-title').focus();
+  initDatePickers();
+  if (IS_DESKTOP) document.getElementById('ti-title').focus();
 }
 
 async function uploadTaskFile(file, taskId) {
@@ -697,10 +722,10 @@ function renderGantt() {
       ? '<div class="gantt-today-line" style="left:' + todayLeft + '%"></div>' : '';
 
     return '<tr class="' + rowClass + '">' +
-      '<td>' + (o.isMain ? '' : ' ↳ ') + escHtml(t.title) + '</td>' +
-      '<td><span class="tag">' + (STATUS_LABEL[t.status]||t.status) + '</span></td>' +
-      '<td>' + (t.startDate||'—') + '</td>' +
-      '<td>' + (t.endDate||'—') + '</td>' +
+      '<td class="gantt-col-title">' + (o.isMain ? '' : ' ↳ ') + escHtml(t.title) + '</td>' +
+      '<td class="gantt-col-status"><span class="tag">' + (STATUS_LABEL[t.status]||t.status) + '</span></td>' +
+      '<td class="gantt-col-date">' + (t.startDate||'—') + '</td>' +
+      '<td class="gantt-col-date">' + (t.endDate||'—') + '</td>' +
       '<td class="gantt-bar-cell"><div class="gantt-bar-outer"><div class="gantt-bar ' + t.status + '" style="left:' + left + '%;width:' + width + '%">' + (width > 8 ? escHtml(t.title) : '') + '</div>' + todayLine + '</div></td>' +
       '</tr>';
   }).join('');
@@ -708,7 +733,13 @@ function renderGantt() {
   const legend = todayInRange
     ? '<div class="gantt-today-legend"><span class="dot"></span>Heute (' + fmtDate(today) + ')</div>' : '';
 
-  container.innerHTML = legend + '<div class="gantt-wrapper"><table class="gantt-table"><thead><tr><th>Aufgabe</th><th>Status</th><th>Start</th><th>Ende</th><th>Zeitstrahl (' + fmtDate(minDate) + ' – ' + fmtDate(maxDate) + ')</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  container.innerHTML = legend + '<div class="gantt-wrapper"><table class="gantt-table"><thead><tr>' +
+    '<th class="gantt-col-title">Aufgabe</th>' +
+    '<th class="gantt-col-status">Status</th>' +
+    '<th class="gantt-col-date">Start</th>' +
+    '<th class="gantt-col-date">Ende</th>' +
+    '<th>Zeitstrahl (' + fmtDate(minDate) + ' – ' + fmtDate(maxDate) + ')</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
 function fmtDate(d) {
@@ -783,7 +814,8 @@ function openTodoModal(id) {
   }
 
   modalTodo.classList.remove('hidden');
-  document.getElementById('td-title').focus();
+  initDatePickers();
+  if (IS_DESKTOP) document.getElementById('td-title').focus();
 }
 
 async function saveTodo() {
@@ -932,7 +964,8 @@ function openHoursModal(id) {
   }
 
   modalHours.classList.remove('hidden');
-  document.getElementById('hr-worker').focus();
+  initDatePickers();
+  if (IS_DESKTOP) document.getElementById('hr-worker').focus();
 }
 
 async function saveHoursEntry() {
