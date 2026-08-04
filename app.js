@@ -69,7 +69,6 @@ const authTitle = document.getElementById('auth-title');
 const authSub = document.getElementById('auth-sub');
 const btnAuthSubmit = document.getElementById('btn-auth-submit');
 const linkForgot = document.getElementById('link-forgot');
-const linkToggleMode = document.getElementById('link-toggle-mode') || null;
 
 const appDiv = document.getElementById('app');
 
@@ -258,6 +257,7 @@ function showApp() {
   appDiv.classList.remove('hidden');
   clearMessages();
   loginPassword.value = '';
+  renderTodos();
 }
 
 function startLiveSync(uid) {
