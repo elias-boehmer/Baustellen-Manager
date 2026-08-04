@@ -124,9 +124,6 @@ document.getElementById('btn-cancel-hours').addEventListener('click', () => moda
 modalHours.addEventListener('click', e => { if (e.target === modalHours) modalHours.classList.add('hidden'); });
 document.getElementById('btn-save-hours').addEventListener('click', saveHoursEntry);
 document.getElementById('hours-filter-worker').addEventListener('change', () => renderHours());
-['hr-start','hr-end','hr-break'].forEach(id => {
-  document.getElementById(id).addEventListener('input', updateHoursPreview);
-});
 
 document.getElementById('btn-change-password').addEventListener('click', () => {
   ['pin-current','pin-new','pin-confirm'].forEach(id => { document.getElementById(id).value = ''; });
@@ -831,25 +828,6 @@ async function deleteTodo(id) {
   await deleteDoc(todoDocRef(id));
 }
 
-function calcHours(start, end, breakMin) {
-  if (!start || !end) return 0;
-  const [sh, sm] = start.split(':').map(Number);
-  const [eh, em] = end.split(':').map(Number);
-  let diffMin = (eh * 60 + em) - (sh * 60 + sm);
-  if (diffMin < 0) diffMin += 24 * 60;
-  diffMin -= (parseInt(breakMin) || 0);
-  return Math.max(diffMin, 0) / 60;
-}
-
-function updateHoursPreview() {
-  const start = document.getElementById('hr-start').value;
-  const end = document.getElementById('hr-end').value;
-  const brk = document.getElementById('hr-break').value;
-  const total = calcHours(start, end, brk);
-  document.getElementById('hr-total-preview').textContent =
-    'Gesamtstunden: ' + total.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + ' Std';
-}
-
 function populateHoursWorkerFilter() {
   const sel = document.getElementById('hours-filter-worker');
   const current = sel.value;
@@ -906,8 +884,7 @@ function renderHours() {
       const task = state.tasks.find(t => t.id === h.taskId);
       return '<div class="hours-card" data-id="' + h.id + '">' +
         '<div class="hours-info">' +
-        '<div class="hours-meta">📅 ' + (h.date || '—') + ' · ⏰ ' + (h.start || '?') + ' – ' + (h.end || '?') +
-        (h.breakMin ? ' · ☕ ' + h.breakMin + ' Min Pause' : '') +
+        '<div class="hours-meta">📅 ' + (h.date || '—') +
         (task ? ' · 🔧 ' + escHtml(task.title) : '') + '</div>' +
         '</div>' +
         '<div class="hours-total">' + (h.totalHours || 0).toLocaleString('de-DE', { minimumFractionDigits: 1 }) + ' Std</div>' +
@@ -946,17 +923,14 @@ function openHoursModal(id) {
     document.getElementById('hr-id').value = h.id;
     document.getElementById('hr-worker').value = h.worker || '';
     document.getElementById('hr-date').value = h.date || '';
-    document.getElementById('hr-start').value = h.start || '';
-    document.getElementById('hr-end').value = h.end || '';
-    document.getElementById('hr-break').value = h.breakMin || '';
+    document.getElementById('hr-total').value = h.totalHours || '';
     document.getElementById('hr-task').value = h.taskId || '';
   } else {
-    ['hr-id','hr-worker','hr-start','hr-end','hr-break'].forEach(i => { document.getElementById(i).value = ''; });
+    ['hr-id','hr-worker','hr-total'].forEach(i => { document.getElementById(i).value = ''; });
     document.getElementById('hr-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('hr-task').value = '';
   }
 
-  updateHoursPreview();
   modalHours.classList.remove('hidden');
   document.getElementById('hr-worker').focus();
 }
@@ -966,12 +940,10 @@ async function saveHoursEntry() {
 
   const worker = document.getElementById('hr-worker').value.trim();
   const date = document.getElementById('hr-date').value;
-  const start = document.getElementById('hr-start').value;
-  const end = document.getElementById('hr-end').value;
-  const breakMin = parseInt(document.getElementById('hr-break').value) || 0;
+  const totalHours = parseFloat(document.getElementById('hr-total').value);
 
-  if (!worker || !date || !start || !end) {
-    alert('Bitte Helfer, Datum, Beginn und Ende ausfüllen.');
+  if (!worker || !date || !totalHours || totalHours <= 0) {
+    alert('Bitte Helfer, Datum und Gesamtstunden ausfüllen.');
     return;
   }
 
@@ -982,10 +954,7 @@ async function saveHoursEntry() {
     id,
     worker,
     date,
-    start,
-    end,
-    breakMin,
-    totalHours: calcHours(start, end, breakMin),
+    totalHours,
     taskId: document.getElementById('hr-task').value || null,
     createdAt: (existing && existing.createdAt) || Date.now()
   };
