@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Baustellen-Tracker</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 </head>
 <body>
 
@@ -220,6 +221,8 @@
     var saved = localStorage.getItem('bt-theme');
     if (saved === 'light') document.documentElement.setAttribute('data-theme', 'light');
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://npmcdn.com/flatpickr/dist/l10n/de.js"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>
