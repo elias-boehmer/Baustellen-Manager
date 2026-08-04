@@ -100,8 +100,49 @@ body {
 .login-links a { color: #60a5fa; text-decoration: none; cursor: pointer; padding: 4px; }
 .login-links a:hover { text-decoration: underline; }
 
-#app { display: flex; min-height: 100dvh; }
+#app { display: flex; min-height: 100dvh; position: relative; }
 #app.hidden { display: none !important; }
+
+.pull-refresh-indicator {
+  position: fixed;
+  top: calc(-60px + env(safe-area-inset-top));
+  left: 0; right: 0;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  transition: top 0.2s ease, opacity 0.2s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+.pull-refresh-indicator.dragging {
+  transition: none;
+}
+.pull-refresh-indicator.visible {
+  opacity: 1;
+}
+.pull-refresh-icon {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem;
+  color: var(--accent);
+  transition: transform 0.2s ease;
+}
+.pull-refresh-icon.ready {
+  transform: rotate(180deg);
+}
+.pull-refresh-icon.spinning {
+  animation: pull-refresh-spin 0.7s linear infinite;
+}
+@keyframes pull-refresh-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 
 .topbar {
   display: none;

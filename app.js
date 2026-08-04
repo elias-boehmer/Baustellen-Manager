@@ -1000,3 +1000,62 @@ async function deleteHoursEntry(id) {
   if (!state.user || !confirm('Zeiteintrag löschen?')) return;
   await deleteDoc(hoursDocRef(id));
 }
+
+(function initPullToRefresh() {
+  const indicator = document.getElementById('pull-refresh-indicator');
+  const icon = indicator.querySelector('.pull-refresh-icon');
+  const THRESHOLD = 70;
+  const MAX_PULL = 110;
+
+  let startY = 0;
+  let pulling = false;
+  let currentPull = 0;
+
+  function isAnyModalOpen() {
+    return [modalTask, modalTodo, modalHours, modalPin].some(m => !m.classList.contains('hidden'));
+  }
+
+  function getScrollTop() {
+    const activePage = document.querySelector('.page.active');
+    return activePage ? activePage.scrollTop || window.scrollY : window.scrollY;
+  }
+
+  document.addEventListener('touchstart', e => {
+    if (isAnyModalOpen() || appDiv.classList.contains('hidden')) return;
+    if (getScrollTop() > 0) return;
+    startY = e.touches[0].clientY;
+    pulling = true;
+    indicator.classList.add('dragging');
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (!pulling || isAnyModalOpen()) return;
+    const deltaY = e.touches[0].clientY - startY;
+    if (deltaY <= 0) { currentPull = 0; indicator.classList.remove('visible'); return; }
+    if (getScrollTop() > 0) return;
+
+    currentPull = Math.min(deltaY, MAX_PULL);
+    const top = -60 + currentPull;
+    indicator.style.top = top + 'px';
+    indicator.classList.add('visible');
+    icon.classList.toggle('ready', currentPull >= THRESHOLD);
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => {
+    if (!pulling) return;
+    pulling = false;
+    indicator.classList.remove('dragging');
+
+    if (currentPull >= THRESHOLD) {
+      indicator.style.top = '10px';
+      icon.classList.remove('ready');
+      icon.classList.add('spinning');
+      icon.textContent = '↻';
+      setTimeout(() => { location.reload(); }, 350);
+    } else {
+      indicator.classList.remove('visible');
+      indicator.style.top = '-60px';
+    }
+    currentPull = 0;
+  });
+})();
