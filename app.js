@@ -22,6 +22,12 @@ import {
   deleteDoc,
   onSnapshot
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB0Sz7MgJp9m-bIoKZq5WCm0-UpFoUyxa4",
@@ -35,6 +41,7 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
+const storage = getStorage(firebaseApp);
 
 const state = {
   user: null,
@@ -120,6 +127,10 @@ document.getElementById('btn-cancel-pin').addEventListener('click', () => modalP
 modalPin.addEventListener('click', e => { if (e.target === modalPin) modalPin.classList.add('hidden'); });
 document.getElementById('btn-save-pin').addEventListener('click', handleChangePassword);
 
+document.getElementById('search-input').addEventListener('input', () => renderTasks());
+document.getElementById('filter-status').addEventListener('change', () => renderTasks());
+document.getElementById('filter-owner').addEventListener('change', () => renderTasks());
+
 onAuthStateChanged(auth, user => {
   clearSubscriptions();
   state.user = user || null;
@@ -171,9 +182,7 @@ async function handleAuthSubmit(e) {
 
   try {
     await setPersistence(auth, browserLocalPersistence);
-
-    // Registrierung vorübergehend deaktiviert – es wird immer nur angemeldet
-await signInWithEmailAndPassword(auth, email, password);
+    await signInWithEmailAndPassword(auth, email, password);
   } catch (error) {
     loginError.textContent = mapAuthError(error);
     loginError.classList.remove('hidden');
@@ -350,12 +359,45 @@ function renderStats() {
     '</div>';
 }
 
+function populateOwnerFilter() {
+  const sel = document.getElementById('filter-owner');
+  const current = sel.value;
+  const owners = [...new Set(state.tasks.map(t => t.owner).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="all">Alle Verantwortlichen</option>' +
+    owners.map(o => '<option value="' + escHtml(o) + '">' + escHtml(o) + '</option>').join('');
+  if (owners.includes(current)) sel.value = current;
+}
+
+function getFilteredMainTasks() {
+  const q = document.getElementById('search-input').value.toLowerCase().trim();
+  const statusFilter = document.getElementById('filter-status').value;
+  const ownerFilter = document.getElementById('filter-owner').value;
+
+  return state.tasks.filter(t => !t.parentId).filter(t => {
+    const subtasks = state.tasks.filter(s => s.parentId === t.id);
+    const haystacks = [t, ...subtasks];
+
+    const matchesQuery = !q || haystacks.some(x =>
+      (x.title || '').toLowerCase().includes(q) ||
+      (x.note || '').toLowerCase().includes(q) ||
+      (x.owner || '').toLowerCase().includes(q)
+    );
+    const matchesStatus = statusFilter === 'all' ||
+      haystacks.some(x => x.status === statusFilter);
+    const matchesOwner = ownerFilter === 'all' ||
+      haystacks.some(x => x.owner === ownerFilter);
+
+    return matchesQuery && matchesStatus && matchesOwner;
+  });
+}
+
 function renderTasks() {
   const container = document.getElementById('task-list');
-  const tasks = state.tasks.filter(t => !t.parentId);
+  populateOwnerFilter();
+  const tasks = getFilteredMainTasks();
 
   if (!tasks.length) {
-    container.innerHTML = '<div class="empty-state"><div class="icon">📋</div>Noch keine Aufgaben. Lege jetzt deine erste an!</div>';
+    container.innerHTML = '<div class="empty-state"><div class="icon">📋</div>Keine Aufgaben gefunden. Passe ggf. Suche/Filter an oder lege eine neue Aufgabe an!</div>';
     return;
   }
 
@@ -371,6 +413,8 @@ function taskCardHTML(task) {
     ? '<span class="tag">📅 ' + (task.startDate||'?') + ' → ' + (task.endDate||'?') + '</span>' : '';
   const budgetTag = task.budget
     ? '<span class="tag budget">💶 ' + Number(task.budget).toLocaleString('de-DE') + ' €</span>' : '';
+  const ownerTag = task.owner
+    ? '<span class="tag task-owner">👤 ' + escHtml(task.owner) + '</span>' : '';
 
   const subsHTML = subtasks.map(st =>
     '<div class="subtask-card" data-id="' + st.id + '">' +
@@ -379,12 +423,16 @@ function taskCardHTML(task) {
     '<div class="task-meta">' +
     (st.budget ? '<span class="tag budget">💶 ' + Number(st.budget).toLocaleString('de-DE') + ' €</span>' : '') +
     (st.startDate ? '<span class="tag">📅 ' + st.startDate + '</span>' : '') +
+    (st.owner ? '<span class="tag task-owner">👤 ' + escHtml(st.owner) + '</span>' : '') +
     '</div>' +
     '<div class="task-actions">' +
     '<button class="icon-btn" data-action="edit" data-id="' + st.id + '" title="Bearbeiten">✏️</button>' +
     '<button class="icon-btn delete" data-action="delete" data-id="' + st.id + '" title="Löschen">🗑️</button>' +
     '</div></div>'
   ).join('');
+
+  const attachmentHTML = task.attachmentUrl
+    ? '<div class="task-attachment"><a href="' + escHtml(task.attachmentUrl) + '" target="_blank" rel="noopener">📎 Anhang öffnen</a></div>' : '';
 
   return '<div class="task-card" data-id="' + task.id + '">' +
     '<div class="task-header">' +
@@ -393,7 +441,7 @@ function taskCardHTML(task) {
     '<span class="task-title" data-action="edit" data-id="' + task.id + '">' + escHtml(task.title) + '</span>' +
     '<div class="task-meta">' +
     '<span class="tag">' + (STATUS_LABEL[task.status]||task.status) + '</span>' +
-    dateTag + budgetTag +
+    dateTag + budgetTag + ownerTag +
     '</div>' +
     '<div class="task-actions">' +
     '<button class="icon-btn" data-action="add-sub" data-id="' + task.id + '" title="Unteraufgabe">➕</button>' +
@@ -406,6 +454,7 @@ function taskCardHTML(task) {
     (task.link ? '<span>🔗 <a href="' + escHtml(task.link) + '" target="_blank" rel="noopener">' + escHtml(task.link) + '</a></span>' : '') +
     (task.file ? '<span>📁 ' + escHtml(task.file) + '</span>' : '') +
     '</div>' +
+    attachmentHTML +
     '<div class="subtask-section">' +
     (hasSubs ? '<div class="subtask-label">Unteraufgaben (' + subtasks.length + ')</div>' : '') +
     subsHTML +
@@ -442,6 +491,9 @@ function openTaskModal(id, parentId) {
   document.getElementById('modal-task-title').textContent =
     isNew ? (parentId ? 'Neue Unteraufgabe' : 'Neue Aufgabe') : 'Aufgabe bearbeiten';
 
+  document.getElementById('ti-file-upload').value = '';
+  document.getElementById('ti-file-list').textContent = '';
+
   if (!isNew) {
     const t = state.tasks.find(t => t.id === id);
     if (!t) return;
@@ -452,18 +504,30 @@ function openTaskModal(id, parentId) {
     document.getElementById('ti-start').value = t.startDate || '';
     document.getElementById('ti-end').value = t.endDate || '';
     document.getElementById('ti-budget').value = t.budget || '';
+    document.getElementById('ti-owner').value = t.owner || '';
     document.getElementById('ti-note').value = t.note || '';
     document.getElementById('ti-link').value = t.link || '';
     document.getElementById('ti-file').value = t.file || '';
+    window.currentTaskAttachmentUrl = t.attachmentUrl || null;
+    if (t.attachmentUrl) document.getElementById('ti-file-list').textContent = '📎 Anhang bereits vorhanden';
   } else {
-    ['ti-id','ti-title','ti-start','ti-end','ti-budget','ti-note','ti-link','ti-file']
+    ['ti-id','ti-title','ti-start','ti-end','ti-budget','ti-owner','ti-note','ti-link','ti-file']
       .forEach(i => { document.getElementById(i).value = ''; });
     document.getElementById('ti-status').value = 'pending';
     document.getElementById('ti-parent').value = parentId || '';
+    window.currentTaskAttachmentUrl = null;
   }
 
   modalTask.classList.remove('hidden');
   document.getElementById('ti-title').focus();
+}
+
+async function uploadTaskFile(file, taskId) {
+  if (!file) return null;
+  const path = 'users/' + state.user.uid + '/tasks/' + taskId + '/' + Date.now() + '_' + file.name;
+  const fileRef = ref(storage, path);
+  await uploadBytes(fileRef, file);
+  return await getDownloadURL(fileRef);
 }
 
 async function saveTask() {
@@ -477,6 +541,17 @@ async function saveTask() {
   const newStatus = document.getElementById('ti-status').value;
   const wasNotDone = !existing || existing.status !== 'done';
 
+  const fileInput = document.getElementById('ti-file-upload');
+  let attachmentUrl = window.currentTaskAttachmentUrl || (existing && existing.attachmentUrl) || null;
+
+  if (fileInput && fileInput.files[0]) {
+    try {
+      attachmentUrl = await uploadTaskFile(fileInput.files[0], id);
+    } catch (err) {
+      alert('❌ Datei-Upload fehlgeschlagen: ' + (err && err.message ? err.message : 'Unbekannter Fehler'));
+    }
+  }
+
   const task = {
     id,
     parentId: document.getElementById('ti-parent').value || null,
@@ -485,9 +560,11 @@ async function saveTask() {
     startDate: document.getElementById('ti-start').value || null,
     endDate: document.getElementById('ti-end').value || null,
     budget: document.getElementById('ti-budget').value || null,
+    owner: document.getElementById('ti-owner').value.trim() || null,
     note: document.getElementById('ti-note').value.trim() || null,
     link: document.getElementById('ti-link').value.trim() || null,
     file: document.getElementById('ti-file').value.trim() || null,
+    attachmentUrl: attachmentUrl,
     createdAt: (existing && existing.createdAt) || Date.now(),
     completedAt: (existing && existing.completedAt) || null
   };
