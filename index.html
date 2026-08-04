@@ -39,12 +39,12 @@
 
     <nav class="sidebar" id="sidebar">
       <div class="logo">Baustellen Manager</div>
-    <ul>
+      <ul>
         <li><a href="#" class="nav-link active" data-page="current">Aktuell</a></li>
         <li><a href="#" class="nav-link" data-page="overview">Übersicht</a></li>
         <li><a href="#" class="nav-link" data-page="calendar">Kalender</a></li>
         <li><a href="#" class="nav-link" data-page="hours">Stunden</a></li>
-    </ul>
+      </ul>
       <div class="sidebar-footer">
         <button class="btn-logout-sidebar" id="btn-theme-toggle">🌓 Farbschema wechseln</button>
         <button class="btn-logout-sidebar" id="btn-change-password">🔑 Passwort ändern</button>
@@ -54,6 +54,14 @@
 
     <main class="content">
       <section id="page-current" class="page active">
+        <div class="page-header">
+          <h1>Aktuell – Meine To-Dos</h1>
+          <button class="btn-primary" id="btn-add-todo">+ To-Do</button>
+        </div>
+        <div id="todo-list"></div>
+      </section>
+
+      <section id="page-overview" class="page">
         <div class="page-header">
           <h1>Übersicht</h1>
           <button class="btn-primary" id="btn-add-task">+ Aufgabe</button>
@@ -78,14 +86,6 @@
       <section id="page-calendar" class="page">
         <div class="page-header"><h1>Kalender / Zeitstrahl</h1></div>
         <div id="gantt-container"></div>
-      </section>
-
-      <section id="page-current" class="page">
-        <div class="page-header">
-          <h1>Aktuell – Meine To-Dos</h1>
-          <button class="btn-primary" id="btn-add-todo">+ To-Do</button>
-        </div>
-        <div id="todo-list"></div>
       </section>
 
       <section id="page-hours" class="page">
