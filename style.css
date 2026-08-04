@@ -598,3 +598,12 @@ body {
 @media (max-width: 768px) {
   .filter-bar { flex-direction: column; }
 }
+.task-card { cursor: default; }
+.task-card.draggable-mode { cursor: grab; }
+.task-card.dragging { opacity: 0.5; }
+.task-card.drag-over { border-color: var(--accent); border-width: 2px; }
+.drag-handle {
+  cursor: grab; color: var(--text-muted); font-size: 1rem;
+  padding: 4px; flex-shrink: 0; touch-action: none;
+}
+.drag-handle:active { cursor: grabbing; }
