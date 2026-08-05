@@ -359,6 +359,17 @@ body {
 .todo-completed { font-size: 0.8rem; color: var(--done); margin-top: 3px; }
 .todo-note { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; word-break: break-word; }
 
+.todo-category-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 4px; margin: 20px 0 10px; border-bottom: 2px solid var(--border);
+}
+.todo-category-header:first-child { margin-top: 0; }
+.todo-category-header .todo-category-name { font-size: 1rem; font-weight: 700; color: var(--accent); }
+.todo-category-count {
+  font-weight: 700; color: var(--accent2);
+  background: var(--surface2); padding: 4px 10px; border-radius: 99px; font-size: 0.85rem;
+}
+
 .hours-group { margin-bottom: 22px; }
 .hours-group-header {
   display: flex; justify-content: space-between; align-items: center;
