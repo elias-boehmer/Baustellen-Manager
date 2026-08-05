@@ -59,6 +59,8 @@ const STATUS_LABEL = {
   done: '✅ Erledigt'
 };
 
+const NO_CATEGORY_LABEL = 'Ohne Kategorie';
+
 const IS_DESKTOP = window.matchMedia('(min-width: 769px)').matches;
 
 const loginScreen = document.getElementById('login-screen');
@@ -765,6 +767,13 @@ function fmtDate(d) {
   return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function populateTodoCategoryList() {
+  const datalist = document.getElementById('td-category-list');
+  if (!datalist) return;
+  const categories = [...new Set(state.todos.map(t => t.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+  datalist.innerHTML = categories.map(c => '<option value="' + escHtml(c) + '">').join('');
+}
+
 function renderTodos() {
   const container = document.getElementById('todo-list');
   const todos = state.todos;
@@ -773,9 +782,6 @@ function renderTodos() {
     container.innerHTML = '<div class="empty-state"><div class="icon">✅</div>Keine To-Dos vorhanden. Super!</div>';
     return;
   }
-
-  const active = todos.filter(t => !t.done).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-  const done = todos.filter(t => t.done).sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -795,15 +801,41 @@ function renderTodos() {
       '</div></div>';
   };
 
-  let html = '';
-  if (active.length) {
-    html += '<div class="todo-section-label">Aktiv (' + active.length + ')</div>';
-    html += active.map(renderItem).join('');
-  }
-  if (done.length) {
-    html += '<div class="todo-section-label">Erledigt (' + done.length + ')</div>';
-    html += done.map(renderItem).join('');
-  }
+  // Gruppierung nach frei eintragbarer Kategorie
+  const grouped = {};
+  todos.forEach(td => {
+    const key = (td.category && td.category.trim()) ? td.category.trim() : NO_CATEGORY_LABEL;
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(td);
+  });
+
+  const categoryNames = Object.keys(grouped).sort((a, b) => {
+    if (a === NO_CATEGORY_LABEL) return 1;
+    if (b === NO_CATEGORY_LABEL) return -1;
+    return a.localeCompare(b, 'de');
+  });
+
+  const html = categoryNames.map(cat => {
+    const items = grouped[cat];
+
+    // Aktive Aufgaben: nächstes Fälligkeitsdatum zuerst, ohne Datum ans Ende
+    const active = items.filter(t => !t.done).sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return (a.createdAt || 0) - (b.createdAt || 0);
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return a.dueDate.localeCompare(b.dueDate);
+    });
+
+    // Erledigte Aufgaben bleiben in der Kategorie, zuletzt erledigt zuerst
+    const done = items.filter(t => t.done).sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
+
+    return '<div class="todo-category-header">' +
+      '<span class="todo-category-name">🗂️ ' + escHtml(cat) + '</span>' +
+      '<span class="todo-category-count">' + active.length + ' offen</span>' +
+      '</div>' +
+      active.map(renderItem).join('') +
+      done.map(renderItem).join('');
+  }).join('');
 
   container.innerHTML = html;
 
@@ -820,16 +852,18 @@ function renderTodos() {
 function openTodoModal(id) {
   id = id || null;
   document.getElementById('modal-todo-title').textContent = id ? 'To-Do bearbeiten' : 'Neues To-Do';
+  populateTodoCategoryList();
 
   if (id) {
     const t = state.todos.find(t => t.id === id);
     if (!t) return;
     document.getElementById('td-id').value = t.id;
     document.getElementById('td-title').value = t.title || '';
+    document.getElementById('td-category').value = t.category || '';
     document.getElementById('td-due').value = t.dueDate || '';
     document.getElementById('td-note').value = t.note || '';
   } else {
-    ['td-id','td-title','td-due','td-note'].forEach(i => { document.getElementById(i).value = ''; });
+    ['td-id','td-title','td-category','td-due','td-note'].forEach(i => { document.getElementById(i).value = ''; });
   }
 
   modalTodo.classList.remove('hidden');
@@ -850,6 +884,7 @@ async function saveTodo() {
   const todo = {
     id,
     title,
+    category: document.getElementById('td-category').value.trim() || null,
     dueDate: document.getElementById('td-due').value || null,
     note: document.getElementById('td-note').value.trim() || null,
     done: (existing && existing.done) || false,
