@@ -214,6 +214,45 @@ function toggleTheme() {
     document.documentElement.setAttribute('data-theme', 'light');
     localStorage.setItem('bt-theme', 'light');
   }
+  state.categoryConfigLoaded = true;
+}
+
+async function saveTodoCategoryConfig() {
+  if (!state.user) return;
+  const refDoc = doc(db, 'users', state.user.uid, 'meta', CATEGORY_DOC_ID);
+  await setDoc(refDoc, { categoryOrder: state.categoryOrder, updatedAt: Date.now() }, { merge: true });
+}
+
+function getTodoCategoryKey(todo) {
+  const c = (todo.category || '').trim();
+  return c ? c : NO_CATEGORY_VALUE;
+}
+
+function getTodoCategoryLabel(key) {
+  return key === NO_CATEGORY_VALUE ? NO_CATEGORY_LABEL : key;
+}
+
+function getOrderedCategories() {
+  const categories = [...new Set(state.todos.map(getTodoCategoryKey))];
+  const noCat = categories.includes(NO_CATEGORY_VALUE) ? [NO_CATEGORY_VALUE] : [];
+  const real = categories.filter(c => c !== NO_CATEGORY_VALUE);
+  const inOrder = state.categoryOrder.filter(c => real.includes(c));
+  const rest = real.filter(c => !inOrder.includes(c)).sort((a, b) => a.localeCompare(b, 'de'));
+  return [...noCat, ...inOrder, ...rest];
+}
+
+function moveCategoryByName(category, delta) {
+  const order = getOrderedCategories().filter(c => c !== NO_CATEGORY_VALUE);
+  const idx = order.indexOf(category);
+  if (idx < 0) return;
+  const next = idx + delta;
+  if (next < 0 || next >= order.length) return;
+  const tmp = order[idx];
+  order[idx] = order[next];
+  order[next] = tmp;
+  state.categoryOrder = order;
+  saveTodoCategoryConfig();
+  renderTodos();
 }
 
 function initDatePickers() {
@@ -288,7 +327,7 @@ async function handleChangePassword() {
     return;
   }
   if (nw !== cf) {
-    errEl.textContent = '❌ Passwörter stimmen nicht überein.';
+    errEl.textContent = '❌ Passw Wörter stimmen nicht überein.';
     errEl.classList.remove('hidden');
     return;
   }
@@ -372,7 +411,7 @@ function escHtml(str) {
 function mapAuthError(error) {
   const code = (error && error.code) || '';
   if (code.includes('invalid-credential')) return '❌ E-Mail oder Passwort ist falsch.';
-  if (code.includes('invalid-email')) return '❌ Die E-Mail-Adresse ist ungültig.';
+  if (code.includes('invalid-email')) return '❌ Die E-Mail-Adresse ist ung ltig.';
   if (code.includes('email-already-in-use')) return '❌ Diese E-Mail-Adresse wird bereits verwendet.';
   if (code.includes('weak-password')) return '❌ Das Passwort muss mind. 6 Zeichen haben.';
   if (code.includes('too-many-requests')) return '❌ Zu viele Versuche. Bitte kurz warten.';
@@ -457,7 +496,7 @@ function taskCardHTML(task) {
     '</div>' +
     '<div class="task-actions">' +
     '<button class="icon-btn" data-action="edit" data-id="' + st.id + '" title="Bearbeiten">✏️</button>' +
-    '<button class="icon-btn delete" data-action="delete" data-id="' + st.id + '" title="Löschen">🗑️</button>' +
+    '<button class="icon-btn delete" data-action="delete" data-id="' + st.id + '" title="L schen">🗑️</button>' +
     '</div></div>'
   ).join('');
   const attachmentHTML = task.attachmentUrl ? '<div class="task-attachment"><a href="' + escHtml(task.attachmentUrl) + '" target="_blank" rel="noopener">📎 Anhang öffnen</a></div>' : '';
@@ -474,7 +513,7 @@ function taskCardHTML(task) {
     '<div class="task-actions">' +
     '<button class="icon-btn" data-action="add-sub" data-id="' + task.id + '" title="Unteraufgabe">➕</button>' +
     '<button class="icon-btn" data-action="edit" data-id="' + task.id + '" title="Bearbeiten">✏️</button>' +
-    '<button class="icon-btn delete" data-action="delete" data-id="' + task.id + '" title="Löschen">🗑️</button>' +
+    '<button class="icon-btn delete" data-action="delete" data-id="' + task.id + '" title="L schen">🗑️</button>' +
     '</div></div>' +
     '<div class="task-body">' +
     '<div class="task-detail">' +
@@ -687,13 +726,13 @@ function renderTodos() {
       '<div class="todo-check ' + (td.done ? 'checked' : '') + '" data-action="toggle-todo" data-id="' + td.id + '"></div>' +
       '<div class="todo-content">' +
       '<div class="todo-title ' + (td.done ? 'done-text' : '') + '">' + escHtml(td.title) + '</div>' +
-      (td.dueDate ? '<div class="todo-due ' + (overdue ? 'overdue' : '') + '">📅 Fällig: ' + td.dueDate + (overdue ? ' ⚠️ Überfällig' : '') + '</div>' : '') +
+      (td.dueDate ? '<div class="todo-due ' + (overdue ? 'overdue' : '') + '">📅 F lig: ' + td.dueDate + (overdue ? ' ⚠️ Überf lig' : '') + '</div>' : '') +
       (td.done && td.completedAt ? '<div class="todo-completed">✅ Erledigt am: ' + td.completedAt + '</div>' : '') +
       (td.note ? '<div class="todo-note">' + escHtml(td.note) + '</div>' : '') +
       '</div>' +
       '<div class="task-actions">' +
       '<button class="icon-btn" data-action="edit-todo" data-id="' + td.id + '" title="Bearbeiten">✏️</button>' +
-      '<button class="icon-btn delete" data-action="delete-todo" data-id="' + td.id + '" title="Löschen">🗑️</button>' +
+      '<button class="icon-btn delete" data-action="delete-todo" data-id="' + td.id + '" title="L schen">🗑️</button>' +
       '</div></div>';
   };
   const grouped = {};
@@ -721,8 +760,9 @@ function renderTodos() {
         (cat !== NO_CATEGORY_VALUE ? '<button class="icon-btn" data-action="category-down" data-category="' + escHtml(cat) + '" title="Kategorie nach unten">⬇️</button>' : '') +
       '</div>' +
       '</div>' +
-      active.map(renderItem).join('') +
-      done.map(renderItem).join('');
+    '</div>' +
+    active.map(renderItem).join('') +
+    done.map(renderItem).join('');
   }).join('');
   container.innerHTML = html;
   container.querySelectorAll('[data-action]').forEach(btn => {
@@ -735,6 +775,18 @@ function renderTodos() {
       else if (action === 'category-down') moveCategoryByName(category, 1);
     });
   });
+}
+
+function populateTodoCategoryList() {
+  const select = document.getElementById('td-category');
+  if (!select) return;
+  const existingVal = select.value;
+  const categories = [...new Set(state.todos.map(t => (t.category || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+  select.innerHTML = '<option value="">Ohne Kategorie</option>' +
+    categories.map(c => '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>').join('') +
+    '<option value="__NEW__">+ Neue Kategorie...</option>';
+  if (existingVal && [...categories, '', '__NEW__'].includes(existingVal)) select.value = existingVal;
+  else select.value = '';
 }
 
 function openTodoModal(id) {
@@ -845,7 +897,7 @@ function renderHours() {
         '<div class="hours-total">' + (h.totalHours || 0).toLocaleString('de-DE', { minimumFractionDigits: 1 }) + ' Std</div>' +
         '<div class="task-actions">' +
         '<button class="icon-btn" data-action="edit-hours" data-id="' + h.id + '" title="Bearbeiten">✏️</button>' +
-        '<button class="icon-btn delete" data-action="delete-hours" data-id="' + h.id + '" title="Löschen">🗑️</button>' +
+        '<button class="icon-btn delete" data-action="delete-hours" data-id="' + h.id + '" title="L schen">🗑️</button>' +
         '</div></div>';
     }).join('');
     return '<div class="hours-group"><div class="hours-group-header">' +
