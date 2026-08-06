@@ -32,7 +32,7 @@
       <div class="login-links">
         <a href="#" id="link-forgot">Passwort vergessen?</a>
       </div>
-      <p class="login-hint">Die Daten werden synchronisiert.</p>
+      <p class="login-hint">Die Daten werden zentral über Firebase synchronisiert.</p>
     </div>
   </div>
 
@@ -169,8 +169,9 @@
         <input id="td-title" type="text" placeholder="To-Do beschreiben ..." autocomplete="off">
       </label>
       <label>Kategorie
-        <input id="td-category" type="text" list="td-category-list" placeholder="z.B. Elektrik, Bad, Garten ..." autocomplete="off">
-        <datalist id="td-category-list"></datalist>
+        <select id="td-category" autocomplete="off">
+          <option value="">Ohne Kategorie</option>
+        </select>
       </label>
       <label>Fällig am
         <input id="td-due" type="date" autocomplete="off">

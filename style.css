@@ -116,12 +116,8 @@ body {
   opacity: 0;
   pointer-events: none;
 }
-.pull-refresh-indicator.dragging {
-  transition: none;
-}
-.pull-refresh-indicator.visible {
-  opacity: 1;
-}
+.pull-refresh-indicator.dragging { transition: none; }
+.pull-refresh-indicator.visible { opacity: 1; }
 .pull-refresh-icon {
   width: 40px; height: 40px;
   border-radius: 50%;
@@ -133,16 +129,9 @@ body {
   color: var(--accent);
   transition: transform 0.2s ease;
 }
-.pull-refresh-icon.ready {
-  transform: rotate(180deg);
-}
-.pull-refresh-icon.spinning {
-  animation: pull-refresh-spin 0.7s linear infinite;
-}
-@keyframes pull-refresh-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
+.pull-refresh-icon.ready { transform: rotate(180deg); }
+.pull-refresh-icon.spinning { animation: pull-refresh-spin 0.7s linear infinite; }
+@keyframes pull-refresh-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 .topbar {
   display: none;
