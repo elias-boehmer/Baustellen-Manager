@@ -20,7 +20,8 @@ import {
   doc,
   setDoc,
   deleteDoc,
-  onSnapshot
+  onSnapshot,
+  getDoc
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 import {
   getStorage,
@@ -49,7 +50,9 @@ const state = {
   todos: [],
   hours: [],
   unsubs: [],
-  authMode: 'login'
+  authMode: 'login',
+  categoryOrder: [],
+  categoryConfigLoaded: false
 };
 
 const STATUS_LABEL = {
@@ -60,7 +63,8 @@ const STATUS_LABEL = {
 };
 
 const NO_CATEGORY_LABEL = 'Ohne Kategorie';
-
+const NO_CATEGORY_VALUE = '__NO_CATEGORY__';
+const CATEGORY_DOC_ID = 'todo-category-config';
 const IS_DESKTOP = window.matchMedia('(min-width: 769px)').matches;
 
 const loginScreen = document.getElementById('login-screen');
@@ -161,15 +165,55 @@ onAuthStateChanged(auth, user => {
   }
 });
 
-function toggleTheme() {
-  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-  if (isLight) {
-    document.documentElement.removeAttribute('data-theme');
-    localStorage.setItem('bt-theme', 'dark');
-  } else {
-    document.documentElement.setAttribute('data-theme', 'light');
-    localStorage.setItem('bt-theme', 'light');
+async function loadTodoCategoryConfig() {
+  if (!state.user || state.categoryConfigLoaded) return;
+  const refDoc = doc(db, 'users', state.user.uid, 'meta', CATEGORY_DOC_ID);
+  try {
+    const snap = await getDoc(refDoc);
+    const data = snap.exists() ? snap.data() : {};
+    state.categoryOrder = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
+  } catch (e) {
+    state.categoryOrder = [];
   }
+  state.categoryConfigLoaded = true;
+}
+
+async function saveTodoCategoryConfig() {
+  if (!state.user) return;
+  const refDoc = doc(db, 'users', state.user.uid, 'meta', CATEGORY_DOC_ID);
+  await setDoc(refDoc, { categoryOrder: state.categoryOrder, updatedAt: Date.now() }, { merge: true });
+}
+
+function getTodoCategoryKey(todo) {
+  const c = (todo.category || '').trim();
+  return c ? c : NO_CATEGORY_VALUE;
+}
+
+function getTodoCategoryLabel(key) {
+  return key === NO_CATEGORY_VALUE ? NO_CATEGORY_LABEL : key;
+}
+
+function getOrderedCategories() {
+  const categories = [...new Set(state.todos.map(getTodoCategoryKey))];
+  const noCat = categories.includes(NO_CATEGORY_VALUE) ? [NO_CATEGORY_VALUE] : [];
+  const real = categories.filter(c => c !== NO_CATEGORY_VALUE);
+  const inOrder = state.categoryOrder.filter(c => real.includes(c));
+  const rest = real.filter(c => !inOrder.includes(c)).sort((a, b) => a.localeCompare(b, 'de'));
+  return [...noCat, ...inOrder, ...rest];
+}
+
+function moveCategoryByName(category, delta) {
+  const order = getOrderedCategories().filter(c => c !== NO_CATEGORY_VALUE);
+  const idx = order.indexOf(category);
+  if (idx < 0) return;
+  const next = idx + delta;
+  if (next < 0 || next >= order.length) return;
+  const tmp = order[idx];
+  order[idx] = order[next];
+  order[next] = tmp;
+  state.categoryOrder = order;
+  saveTodoCategoryConfig();
+  renderTodos();
 }
 
 function initDatePickers() {
@@ -256,7 +300,7 @@ async function handleChangePassword() {
     return;
   }
   if (nw !== cf) {
-    errEl.textContent = '❌ Passwörter stimmen nicht überein.';
+    errEl.textContent = '❌ Passw Wörter stimmen nicht überein.';
     errEl.classList.remove('hidden');
     return;
   }
@@ -293,11 +337,12 @@ function showLogin() {
   renderHours();
 }
 
-function showApp() {
+async function showApp() {
   loginScreen.classList.add('hidden');
   appDiv.classList.remove('hidden');
   clearMessages();
   loginPassword.value = '';
+  await loadTodoCategoryConfig();
   renderTodos();
   initDatePickers();
 }
@@ -357,7 +402,7 @@ function escHtml(str) {
 function mapAuthError(error) {
   const code = (error && error.code) || '';
   if (code.includes('invalid-credential')) return '❌ E-Mail oder Passwort ist falsch.';
-  if (code.includes('invalid-email')) return '❌ Die E-Mail-Adresse ist ungültig.';
+  if (code.includes('invalid-email')) return '❌ Die E-Mail-Adresse ist ung ltig.';
   if (code.includes('email-already-in-use')) return '❌ Diese E-Mail-Adresse wird bereits verwendet.';
   if (code.includes('weak-password')) return '❌ Das Passwort muss mind. 6 Zeichen haben.';
   if (code.includes('too-many-requests')) return '❌ Zu viele Versuche. Bitte kurz warten.';
@@ -482,7 +527,7 @@ function taskCardHTML(task) {
     '</div>' +
     '<div class="task-actions">' +
     '<button class="icon-btn" data-action="edit" data-id="' + st.id + '" title="Bearbeiten">✏️</button>' +
-    '<button class="icon-btn delete" data-action="delete" data-id="' + st.id + '" title="Löschen">🗑️</button>' +
+    '<button class="icon-btn delete" data-action="delete" data-id="' + st.id + '" title="L schen">🗑️</button>' +
     '</div></div>'
   ).join('');
 
@@ -502,7 +547,7 @@ function taskCardHTML(task) {
     '<div class="task-actions">' +
     '<button class="icon-btn" data-action="add-sub" data-id="' + task.id + '" title="Unteraufgabe">➕</button>' +
     '<button class="icon-btn" data-action="edit" data-id="' + task.id + '" title="Bearbeiten">✏️</button>' +
-    '<button class="icon-btn delete" data-action="delete" data-id="' + task.id + '" title="Löschen">🗑️</button>' +
+    '<button class="icon-btn delete" data-action="delete" data-id="' + task.id + '" title="L schen">🗑️</button>' +
     '</div></div>' +
     '<div class="task-body">' +
     '<div class="task-detail">' +
@@ -767,13 +812,6 @@ function fmtDate(d) {
   return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-function populateTodoCategoryList() {
-  const datalist = document.getElementById('td-category-list');
-  if (!datalist) return;
-  const categories = [...new Set(state.todos.map(t => t.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
-  datalist.innerHTML = categories.map(c => '<option value="' + escHtml(c) + '">').join('');
-}
-
 function renderTodos() {
   const container = document.getElementById('todo-list');
   const todos = state.todos;
@@ -791,62 +829,71 @@ function renderTodos() {
       '<div class="todo-check ' + (td.done ? 'checked' : '') + '" data-action="toggle-todo" data-id="' + td.id + '"></div>' +
       '<div class="todo-content">' +
       '<div class="todo-title ' + (td.done ? 'done-text' : '') + '">' + escHtml(td.title) + '</div>' +
-      (td.dueDate ? '<div class="todo-due ' + (overdue ? 'overdue' : '') + '">📅 Fällig: ' + td.dueDate + (overdue ? ' ⚠️ Überfällig' : '') + '</div>' : '') +
+      (td.dueDate ? '<div class="todo-due ' + (overdue ? 'overdue' : '') + '">📅 F lig: ' + td.dueDate + (overdue ? ' ⚠️ Überf lig' : '') + '</div>' : '') +
       (td.done && td.completedAt ? '<div class="todo-completed">✅ Erledigt am: ' + td.completedAt + '</div>' : '') +
       (td.note ? '<div class="todo-note">' + escHtml(td.note) + '</div>' : '') +
       '</div>' +
       '<div class="task-actions">' +
       '<button class="icon-btn" data-action="edit-todo" data-id="' + td.id + '" title="Bearbeiten">✏️</button>' +
-      '<button class="icon-btn delete" data-action="delete-todo" data-id="' + td.id + '" title="Löschen">🗑️</button>' +
+      '<button class="icon-btn delete" data-action="delete-todo" data-id="' + td.id + '" title="L schen">🗑️</button>' +
       '</div></div>';
   };
 
-  // Gruppierung nach frei eintragbarer Kategorie
   const grouped = {};
   todos.forEach(td => {
-    const key = (td.category && td.category.trim()) ? td.category.trim() : NO_CATEGORY_LABEL;
+    const key = getTodoCategoryKey(td);
     if (!grouped[key]) grouped[key] = [];
     grouped[key].push(td);
   });
 
-  const categoryNames = Object.keys(grouped).sort((a, b) => {
-    if (a === NO_CATEGORY_LABEL) return 1;
-    if (b === NO_CATEGORY_LABEL) return -1;
-    return a.localeCompare(b, 'de');
-  });
-
-  const html = categoryNames.map(cat => {
-    const items = grouped[cat];
-
-    // Aktive Aufgaben: nächstes Fälligkeitsdatum zuerst, ohne Datum ans Ende
+  const orderedCategories = getOrderedCategories();
+  const html = orderedCategories.map(cat => {
+    const items = grouped[cat] || [];
     const active = items.filter(t => !t.done).sort((a, b) => {
       if (!a.dueDate && !b.dueDate) return (a.createdAt || 0) - (b.createdAt || 0);
       if (!a.dueDate) return 1;
       if (!b.dueDate) return -1;
       return a.dueDate.localeCompare(b.dueDate);
     });
-
-    // Erledigte Aufgaben bleiben in der Kategorie, zuletzt erledigt zuerst
     const done = items.filter(t => t.done).sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
+    const openCount = active.length;
 
-    return '<div class="todo-category-header">' +
-      '<span class="todo-category-name">🗂️ ' + escHtml(cat) + '</span>' +
-      '<span class="todo-category-count">' + active.length + ' offen</span>' +
+    return '<div class="todo-category-header" data-category="' + escHtml(cat) + '">' +
+      '<span class="todo-category-name">🗂️ ' + escHtml(getTodoCategoryLabel(cat)) + '</span>' +
+      '<span class="todo-category-count">' + openCount + ' offen</span>' +
+      '<div class="task-actions">' +
+        (cat !== NO_CATEGORY_VALUE ? '<button class="icon-btn" data-action="category-up" data-category="' + escHtml(cat) + '" title="Kategorie nach oben">⬆️</button>' : '') +
+        (cat !== NO_CATEGORY_VALUE ? '<button class="icon-btn" data-action="category-down" data-category="' + escHtml(cat) + '" title="Kategorie nach unten">⬇️</button>' : '') +
       '</div>' +
-      active.map(renderItem).join('') +
-      done.map(renderItem).join('');
+    '</div>' +
+    active.map(renderItem).join('') +
+    done.map(renderItem).join('');
   }).join('');
 
   container.innerHTML = html;
 
   container.querySelectorAll('[data-action]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const { action, id } = btn.dataset;
+      const { action, id, category } = btn.dataset;
       if (action === 'toggle-todo') toggleTodo(id);
       else if (action === 'edit-todo') openTodoModal(id);
       else if (action === 'delete-todo') deleteTodo(id);
+      else if (action === 'category-up') moveCategoryByName(category, -1);
+      else if (action === 'category-down') moveCategoryByName(category, 1);
     });
   });
+}
+
+function populateTodoCategoryList() {
+  const select = document.getElementById('td-category');
+  if (!select) return;
+  const existingVal = select.value;
+  const categories = [...new Set(state.todos.map(t => (t.category || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+  select.innerHTML = '<option value="">Ohne Kategorie</option>' +
+    categories.map(c => '<option value="' + escHtml(c) + '">' + escHtml(c) + '</option>').join('') +
+    '<option value="__NEW__">+ Neue Kategorie...</option>';
+  if (existingVal && [...categories, '', '__NEW__'].includes(existingVal)) select.value = existingVal;
+  else select.value = '';
 }
 
 function openTodoModal(id) {
@@ -878,13 +925,25 @@ async function saveTodo() {
   const title = document.getElementById('td-title').value.trim();
   if (!title) { alert('Bitte einen Titel eingeben.'); return; }
 
+  const categoryEl = document.getElementById('td-category');
+  let category = categoryEl.value.trim();
+  if (category === '__NEW__') {
+    category = prompt('Neue Kategorie eingeben:')?.trim() || '';
+  }
+  if (category) {
+    const existingOrder = state.categoryOrder.filter(c => c !== category);
+    if (!existingOrder.includes(category)) existingOrder.push(category);
+    state.categoryOrder = existingOrder;
+    await saveTodoCategoryConfig();
+  }
+
   const id = document.getElementById('td-id').value || uid();
   const existing = state.todos.find(t => t.id === id);
 
   const todo = {
     id,
     title,
-    category: document.getElementById('td-category').value.trim() || null,
+    category: category || null,
     dueDate: document.getElementById('td-due').value || null,
     note: document.getElementById('td-note').value.trim() || null,
     done: (existing && existing.done) || false,
@@ -977,7 +1036,7 @@ function renderHours() {
         '<div class="hours-total">' + (h.totalHours || 0).toLocaleString('de-DE', { minimumFractionDigits: 1 }) + ' Std</div>' +
         '<div class="task-actions">' +
         '<button class="icon-btn" data-action="edit-hours" data-id="' + h.id + '" title="Bearbeiten">✏️</button>' +
-        '<button class="icon-btn delete" data-action="delete-hours" data-id="' + h.id + '" title="Löschen">🗑️</button>' +
+        '<button class="icon-btn delete" data-action="delete-hours" data-id="' + h.id + '" title="L schen">🗑️</button>' +
         '</div></div>';
     }).join('');
 
@@ -1032,7 +1091,7 @@ async function saveHoursEntry() {
   const totalHours = parseFloat(document.getElementById('hr-total').value);
 
   if (!worker || !date || !totalHours || totalHours <= 0) {
-    alert('Bitte Helfer, Datum und Gesamtstunden ausfüllen.');
+    alert('Bitte Helfer, Datum und Gesamtstunden ausf llen.');
     return;
   }
 
