@@ -121,6 +121,21 @@ document.getElementById('btn-cancel-todo').addEventListener('click', () => modal
 modalTodo.addEventListener('click', e => { if (e.target === modalTodo) modalTodo.classList.add('hidden'); });
 document.getElementById('btn-save-todo').addEventListener('click', saveTodo);
 
+document.getElementById('td-category').addEventListener('change', function() {
+  const wrap = document.getElementById('td-new-category-wrap');
+  const input = document.getElementById('td-new-category');
+  if (this.value === '__NEW__') {
+    wrap.style.display = 'flex';
+    wrap.style.flexDirection = 'column';
+    wrap.style.gap = '5px';
+    input.value = '';
+    input.focus();
+  } else {
+    wrap.style.display = 'none';
+    input.value = '';
+  }
+});
+
 document.getElementById('btn-add-hours').addEventListener('click', () => openHoursModal());
 document.getElementById('btn-cancel-hours').addEventListener('click', () => modalHours.classList.add('hidden'));
 modalHours.addEventListener('click', e => { if (e.target === modalHours) modalHours.classList.add('hidden'); });
@@ -289,7 +304,7 @@ async function handleChangePassword() {
     return;
   }
   if (nw !== cf) {
-    errEl.textContent = '❌ Passw Wörter stimmen nicht überein.';
+    errEl.textContent = '❌ Passwörter stimmen nicht überein.';
     errEl.classList.remove('hidden');
     return;
   }
@@ -373,7 +388,7 @@ function escHtml(str) {
 function mapAuthError(error) {
   const code = (error && error.code) || '';
   if (code.includes('invalid-credential')) return '❌ E-Mail oder Passwort ist falsch.';
-  if (code.includes('invalid-email')) return '❌ Die E-Mail-Adresse ist ung ltig.';
+  if (code.includes('invalid-email')) return '❌ Die E-Mail-Adresse ist ungültig.';
   if (code.includes('email-already-in-use')) return '❌ Diese E-Mail-Adresse wird bereits verwendet.';
   if (code.includes('weak-password')) return '❌ Das Passwort muss mind. 6 Zeichen haben.';
   if (code.includes('too-many-requests')) return '❌ Zu viele Versuche. Bitte kurz warten.';
@@ -458,7 +473,7 @@ function taskCardHTML(task) {
     '</div>' +
     '<div class="task-actions">' +
     '<button class="icon-btn" data-action="edit" data-id="' + st.id + '" title="Bearbeiten">✏️</button>' +
-    '<button class="icon-btn delete" data-action="delete" data-id="' + st.id + '" title="L schen">🗑️</button>' +
+    '<button class="icon-btn delete" data-action="delete" data-id="' + st.id + '" title="Löschen">🗑️</button>' +
     '</div></div>'
   ).join('');
   const attachmentHTML = task.attachmentUrl ? '<div class="task-attachment"><a href="' + escHtml(task.attachmentUrl) + '" target="_blank" rel="noopener">📎 Anhang öffnen</a></div>' : '';
@@ -475,7 +490,7 @@ function taskCardHTML(task) {
     '<div class="task-actions">' +
     '<button class="icon-btn" data-action="add-sub" data-id="' + task.id + '" title="Unteraufgabe">➕</button>' +
     '<button class="icon-btn" data-action="edit" data-id="' + task.id + '" title="Bearbeiten">✏️</button>' +
-    '<button class="icon-btn delete" data-action="delete" data-id="' + task.id + '" title="L schen">🗑️</button>' +
+    '<button class="icon-btn delete" data-action="delete" data-id="' + task.id + '" title="Löschen">🗑️</button>' +
     '</div></div>' +
     '<div class="task-body">' +
     '<div class="task-detail">' +
@@ -491,26 +506,31 @@ function taskCardHTML(task) {
     '</div></div></div>';
 }
 
+let taskListDelegationBound = false;
 function bindTaskEvents() {
-  document.querySelectorAll('.task-header').forEach(header => {
-    header.addEventListener('click', e => {
-      if (e.target.closest('.task-actions') || e.target.closest('.task-title') || e.target.closest('.drag-handle')) return;
-      const card = header.closest('.task-card');
-      const body = card.querySelector('.task-body');
-      const toggle = header.querySelector('.task-toggle');
-      body.classList.toggle('open');
-      if (toggle) toggle.classList.toggle('open');
+  if (!taskListDelegationBound) {
+    const container = document.getElementById('task-list');
+    container.addEventListener('click', e => {
+      const actionEl = e.target.closest('[data-action]');
+      if (actionEl) {
+        e.stopPropagation();
+        const { action, id } = actionEl.dataset;
+        if (action === 'edit') openTaskModal(id);
+        else if (action === 'delete') deleteTask(id);
+        else if (action === 'add-sub') openTaskModal(null, id);
+        return;
+      }
+      const header = e.target.closest('.task-header');
+      if (header) {
+        const card = header.closest('.task-card');
+        const body = card.querySelector('.task-body');
+        const toggle = header.querySelector('.task-toggle');
+        body.classList.toggle('open');
+        if (toggle) toggle.classList.toggle('open');
+      }
     });
-  });
-  document.querySelectorAll('[data-action]').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      const { action, id } = btn.dataset;
-      if (action === 'edit') openTaskModal(id);
-      else if (action === 'delete') deleteTask(id);
-      else if (action === 'add-sub') openTaskModal(null, id);
-    });
-  });
+    taskListDelegationBound = true;
+  }
   bindDragEvents();
 }
 
@@ -611,8 +631,12 @@ async function saveTask() {
   };
   if (newStatus === 'done' && wasNotDone) task.completedAt = new Date().toISOString().split('T')[0];
   else if (newStatus !== 'done') task.completedAt = null;
-  await setDoc(taskDocRef(id), task);
-  modalTask.classList.add('hidden');
+  try {
+    await setDoc(taskDocRef(id), task);
+    modalTask.classList.add('hidden');
+  } catch (err) {
+    alert('❌ Speichern fehlgeschlagen: ' + (err && err.message ? err.message : 'Unbekannter Fehler'));
+  }
 }
 
 async function deleteTask(id) {
@@ -688,13 +712,13 @@ function renderTodos() {
       '<div class="todo-check ' + (td.done ? 'checked' : '') + '" data-action="toggle-todo" data-id="' + td.id + '"></div>' +
       '<div class="todo-content">' +
       '<div class="todo-title ' + (td.done ? 'done-text' : '') + '">' + escHtml(td.title) + '</div>' +
-      (td.dueDate ? '<div class="todo-due ' + (overdue ? 'overdue' : '') + '">📅 F lig: ' + td.dueDate + (overdue ? ' ⚠️ Überf lig' : '') + '</div>' : '') +
+      (td.dueDate ? '<div class="todo-due ' + (overdue ? 'overdue' : '') + '">📅 Fällig: ' + td.dueDate + (overdue ? ' ⚠️ überfällig' : '') + '</div>' : '') +
       (td.done && td.completedAt ? '<div class="todo-completed">✅ Erledigt am: ' + td.completedAt + '</div>' : '') +
       (td.note ? '<div class="todo-note">' + escHtml(td.note) + '</div>' : '') +
       '</div>' +
       '<div class="task-actions">' +
       '<button class="icon-btn" data-action="edit-todo" data-id="' + td.id + '" title="Bearbeiten">✏️</button>' +
-      '<button class="icon-btn delete" data-action="delete-todo" data-id="' + td.id + '" title="L schen">🗑️</button>' +
+      '<button class="icon-btn delete" data-action="delete-todo" data-id="' + td.id + '" title="Löschen">🗑️</button>' +
       '</div></div>';
   };
   const grouped = {};
@@ -743,6 +767,8 @@ function openTodoModal(id) {
   id = id || null;
   document.getElementById('modal-todo-title').textContent = id ? 'To-Do bearbeiten' : 'Neues To-Do';
   populateTodoCategoryList();
+  document.getElementById('td-new-category-wrap').style.display = 'none';
+  document.getElementById('td-new-category').value = '';
   if (id) {
     const t = state.todos.find(t => t.id === id);
     if (!t) return;
@@ -767,7 +793,8 @@ async function saveTodo() {
   const categoryEl = document.getElementById('td-category');
   let category = categoryEl.value.trim();
   if (category === '__NEW__') {
-    category = (prompt('Neue Kategorie eingeben:') || '').trim();
+    category = document.getElementById('td-new-category').value.trim();
+    if (!category) { alert('Bitte einen Namen für die neue Kategorie eingeben.'); return; }
   }
   if (category) {
     const existingOrder = state.categoryOrder.filter(c => c !== category);
@@ -787,8 +814,12 @@ async function saveTodo() {
     completedAt: (existing && existing.completedAt) || null,
     createdAt: (existing && existing.createdAt) || Date.now()
   };
-  await setDoc(todoDocRef(id), todo);
-  modalTodo.classList.add('hidden');
+  try {
+    await setDoc(todoDocRef(id), todo);
+    modalTodo.classList.add('hidden');
+  } catch (err) {
+    alert('❌ Speichern fehlgeschlagen: ' + (err && err.message ? err.message : 'Unbekannter Fehler'));
+  }
 }
 
 async function toggleTodo(id) {
@@ -847,7 +878,7 @@ function renderHours() {
         '<div class="hours-total">' + (h.totalHours || 0).toLocaleString('de-DE', { minimumFractionDigits: 1 }) + ' Std</div>' +
         '<div class="task-actions">' +
         '<button class="icon-btn" data-action="edit-hours" data-id="' + h.id + '" title="Bearbeiten">✏️</button>' +
-        '<button class="icon-btn delete" data-action="delete-hours" data-id="' + h.id + '" title="L schen">🗑️</button>' +
+        '<button class="icon-btn delete" data-action="delete-hours" data-id="' + h.id + '" title="Löschen">🗑️</button>' +
         '</div></div>';
     }).join('');
     return '<div class="hours-group"><div class="hours-group-header">' +
@@ -896,8 +927,12 @@ async function saveHoursEntry() {
   const id = document.getElementById('hr-id').value || uid();
   const existing = state.hours.find(h => h.id === id);
   const entry = { id, worker, date, totalHours, taskId: document.getElementById('hr-task').value || null, createdAt: (existing && existing.createdAt) || Date.now() };
-  await setDoc(hoursDocRef(id), entry);
-  modalHours.classList.add('hidden');
+  try {
+    await setDoc(hoursDocRef(id), entry);
+    modalHours.classList.add('hidden');
+  } catch (err) {
+    alert('❌ Speichern fehlgeschlagen: ' + (err && err.message ? err.message : 'Unbekannter Fehler'));
+  }
 }
 
 async function deleteHoursEntry(id) {
