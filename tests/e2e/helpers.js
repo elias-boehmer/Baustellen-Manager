@@ -6,18 +6,19 @@ async function login(page) {
   }
 
   await page.goto('/');
+  await page.waitForLoadState('networkidle').catch(() => {});
 
-  const emailInput = page.locator('input[type="email"], input[name="email"], input#email, input[placeholder*="mail" i]').first();
-  const passwordInput = page.locator('input[type="password"], input[name="password"], input#password').first();
+  const emailInput = page.locator('#login-email');
+  const passwordInput = page.locator('#login-password');
+  const loginButton = page.locator('#btn-auth-submit');
 
-  await emailInput.waitFor({ state: 'visible', timeout: 15000 });
+  await emailInput.waitFor({ state: 'visible', timeout: 30000 });
   await emailInput.fill(email);
   await passwordInput.fill(password);
-
-  const loginButton = page.locator('button:has-text("Anmelden"), button:has-text("Login"), button:has-text("Einloggen"), button[type="submit"]').first();
   await loginButton.click();
 
-  await passwordInput.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+  // Nach erfolgreichem Login verschwindet #login-screen bzw. #app wird sichtbar.
+  await page.locator('#login-screen').waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
 }
 
 async function getInteractiveElements(page) {
