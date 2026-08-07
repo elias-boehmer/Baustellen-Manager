@@ -24,6 +24,24 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Auf Pages-Deployment warten
+        env:
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+        run: |
+          URL="${E2E_BASE_URL:-https://elias-boehmer.github.io/Baustellen-Manager/}"
+          echo "Warte auf $URL ..."
+          for i in $(seq 1 24); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+            if [ "$STATUS" = "200" ]; then
+              echo "Seite ist erreichbar (Status $STATUS)."
+              exit 0
+            fi
+            echo "Versuch $i: Status $STATUS, warte 5s ..."
+            sleep 5
+          done
+          echo "Seite war nach 2 Minuten nicht erreichbar (letzter Status: $STATUS)."
+          exit 1
+
       - name: Run E2E tests
         env:
           E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
