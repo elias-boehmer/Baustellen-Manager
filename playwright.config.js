@@ -1,6 +1,10 @@
 const { defineConfig, devices } = require('@playwright/test');
 
-const BASE_URL = process.env.E2E_BASE_URL || 'https://elias-boehmer.github.io/Baustellen-Manager/';
+function normalizeUrl(url) {
+  return url.endsWith('/') ? url : `${url}/`;
+}
+
+const BASE_URL = normalizeUrl(process.env.E2E_BASE_URL || 'https://elias-boehmer.github.io/Baustellen-Manager/');
 
 module.exports = defineConfig({
   testDir: './tests/e2e',
