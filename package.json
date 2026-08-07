@@ -1,0 +1,12 @@
+{
+  "name": "baustellen-manager",
+  "version": "4.9.0",
+  "private": true,
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.0"
+  }
+}
