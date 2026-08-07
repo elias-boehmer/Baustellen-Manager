@@ -479,7 +479,7 @@ function taskCardHTML(task) {
   const attachmentHTML = task.attachmentUrl ? '<div class="task-attachment"><a href="' + escHtml(task.attachmentUrl) + '" target="_blank" rel="noopener">📎 Anhang öffnen</a></div>' : '';
   return '<div class="task-card" data-id="' + task.id + '" draggable="true">' +
     '<div class="task-header">' +
-    '<span class="drag-handle" title="Ziehen zum Sortieren">⠠</span>' +
+    '<span class="drag-handle" title="Ziehen zum Sortieren">⋮⋮</span>' +
     '<span class="task-toggle ' + (hasSubs ? '' : 'invisible') + '">▶</span>' +
     '<div class="status-dot ' + task.status + '"></div>' +
     '<span class="task-title" data-action="edit" data-id="' + task.id + '">' + escHtml(task.title) + '</span>' +
@@ -711,7 +711,7 @@ function renderTodos() {
     return '<div class="todo-item ' + (td.done ? 'is-done' : '') + '" data-id="' + td.id + '">' +
       '<div class="todo-check ' + (td.done ? 'checked' : '') + '" data-action="toggle-todo" data-id="' + td.id + '"></div>' +
       '<div class="todo-content">' +
-      '<div class="todo-title ' + (td.done ? 'done-text' : '') + '">' + escHtml(td.title) + '</div>' +
+      '<div class="todo-title ' + (td.done ? 'done-text' : '') + '" data-action="edit-todo" data-id="' + td.id + '">' + escHtml(td.title) + '</div>' +
       (td.dueDate ? '<div class="todo-due ' + (overdue ? 'overdue' : '') + '">📅 Fällig: ' + td.dueDate + (overdue ? ' ⚠️ überfällig' : '') + '</div>' : '') +
       (td.done && td.completedAt ? '<div class="todo-completed">✅ Erledigt am: ' + td.completedAt + '</div>' : '') +
       (td.note ? '<div class="todo-note">' + escHtml(td.note) + '</div>' : '') +
@@ -797,10 +797,15 @@ async function saveTodo() {
     if (!category) { alert('Bitte einen Namen für die neue Kategorie eingeben.'); return; }
   }
   if (category) {
-    const existingOrder = state.categoryOrder.filter(c => c !== category);
-    if (!existingOrder.includes(category)) existingOrder.push(category);
-    state.categoryOrder = existingOrder;
-    await saveTodoCategoryConfig();
+    try {
+      const existingOrder = state.categoryOrder.filter(c => c !== category);
+      if (!existingOrder.includes(category)) existingOrder.push(category);
+      state.categoryOrder = existingOrder;
+      await saveTodoCategoryConfig();
+    } catch (err) {
+      alert('❌ Kategorie konnte nicht gespeichert werden: ' + (err && err.message ? err.message : 'Unbekannter Fehler'));
+      return;
+    }
   }
   const id = document.getElementById('td-id').value || uid();
   const existing = state.todos.find(t => t.id === id);
