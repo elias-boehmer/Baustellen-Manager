@@ -1,13 +1,23 @@
+function normalizeUrl(url) {
+  return url.endsWith('/') ? url : `${url}/`;
+}
+
+const APP_URL = normalizeUrl(process.env.E2E_BASE_URL || 'https://elias-boehmer.github.io/Baustellen-Manager/');
+
 async function gotoWithPagesRetry(page, maxAttempts = 5) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    // Immer die volle, absolute URL verwenden statt einer relativen '/'-Navigation.
+    // Grund: Wenn baseURL keinen abschliessenden Schrägstrich hat, wuerde goto('/')
+    // laut URL-Standard zur Domain-Wurzel aufloesen (z.B. https://user.github.io/
+    // statt https://user.github.io/Repo/) - und dort liegt keine Pages-Seite -> 404.
+    await page.goto(APP_URL, { waitUntil: 'domcontentloaded' });
     const bodyText = await page.locator('body').innerText().catch(() => '');
     const is404 = bodyText.includes("There isn't a GitHub Pages site here");
     if (!is404) return;
-    console.log(`Pages-404 erkannt (Versuch ${attempt}/${maxAttempts}), warte 5s und lade neu ...`);
+    console.log(`Pages-404 erkannt (Versuch ${attempt}/${maxAttempts}) bei URL ${APP_URL}, warte 5s und lade neu ...`);
     await page.waitForTimeout(5000);
   }
-  throw new Error('GitHub Pages liefert nach mehreren Versuchen weiterhin eine 404-Seite.');
+  throw new Error(`GitHub Pages liefert nach mehreren Versuchen weiterhin eine 404-Seite (URL: ${APP_URL}).`);
 }
 
 async function login(page) {
@@ -35,6 +45,7 @@ async function login(page) {
   } catch (err) {
     const html = await page.content();
     console.log('=== DIAGNOSE: #login-email nicht sichtbar ===');
+    console.log('Aktuelle URL:', page.url());
     console.log('--- Browser console/network ---');
     console.log(consoleMessages.slice(-40).join('\n') || '(keine console-Ausgaben)');
     console.log('--- Page errors (JS-Exceptions im Browser) ---');
