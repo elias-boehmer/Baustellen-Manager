@@ -7,12 +7,14 @@ test.describe('Regressionstests fuer zuletzt gemeldete Bugs', () => {
 
     const categoryTrigger = page.locator('text=/kategorie/i').first();
     if (await categoryTrigger.count() === 0) {
-      test.skip(true, 'Kein Kategorie-Element auf der Seite gefunden - Test uebersprungen.');
+      test.skip(true, 'Kein Kategorie-Element gefunden – Test uebersprungen.');
     }
-    await categoryTrigger.click({ trial: false }).catch(() => {});
 
-    const errorBanner = page.locator('text=/❌.*(gespeichert|permission)/i');
-    await expect(errorBanner).toHaveCount(0);
+    await categoryTrigger.click();
+
+    // explizit auf den urspruenglichen Firestore-Fehler pruefen
+    const permissionError = page.locator('text=/Missing or insufficient permissions/i');
+    await expect(permissionError).toHaveCount(0);
   });
 
   test('Klick auf Todo-Titel unter "Aktuell" oeffnet Bearbeiten-Ansicht', async ({ page }) => {
@@ -25,7 +27,7 @@ test.describe('Regressionstests fuer zuletzt gemeldete Bugs', () => {
 
     const todoTitle = page.locator('[data-action], .todo-title, .task-title').first();
     if (await todoTitle.count() === 0) {
-      test.skip(true, 'Kein Todo-Titel gefunden - Test uebersprungen (evtl. keine Testdaten angelegt).');
+      test.skip(true, 'Kein Todo-Titel gefunden – Test uebersprungen (evtl. keine Testdaten angelegt).');
     }
 
     await todoTitle.click();
