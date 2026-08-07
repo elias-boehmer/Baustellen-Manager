@@ -24,22 +24,32 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Auf Pages-Deployment warten
+      - name: Auf stabiles Pages-Deployment warten
         env:
           E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
         run: |
           URL="${E2E_BASE_URL:-https://elias-boehmer.github.io/Baustellen-Manager/}"
-          echo "Warte auf $URL ..."
-          for i in $(seq 1 24); do
+          echo "Warte auf $URL (benoetige 3 aufeinanderfolgende Erfolge) ..."
+          SUCCESS_STREAK=0
+          for i in $(seq 1 40); do
+            BODY=$(curl -s "$URL")
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
-            if [ "$STATUS" = "200" ]; then
-              echo "Seite ist erreichbar (Status $STATUS)."
-              exit 0
+            if [ "$STATUS" = "200" ] && ! echo "$BODY" | grep -q "There isn't a GitHub Pages site here"; then
+              SUCCESS_STREAK=$((SUCCESS_STREAK + 1))
+              echo "Versuch $i: OK (Streak $SUCCESS_STREAK/3)"
+              if [ "$SUCCESS_STREAK" -ge 3 ]; then
+                echo "Seite ist stabil erreichbar."
+                echo "Zusaetzlicher Sicherheitspuffer: 20s warten, damit alle CDN-Knoten aktuell sind."
+                sleep 20
+                exit 0
+              fi
+            else
+              SUCCESS_STREAK=0
+              echo "Versuch $i: Status $STATUS oder 404-Inhalt erkannt, Streak zurueckgesetzt, warte 5s ..."
             fi
-            echo "Versuch $i: Status $STATUS, warte 5s ..."
             sleep 5
           done
-          echo "Seite war nach 2 Minuten nicht erreichbar (letzter Status: $STATUS)."
+          echo "Seite war nach mehreren Minuten nicht stabil erreichbar."
           exit 1
 
       - name: Run E2E tests
