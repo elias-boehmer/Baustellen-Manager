@@ -5,14 +5,25 @@ test.describe('Regressionstests fuer zuletzt gemeldete Bugs', () => {
   test('Kategorie auswaehlen erzeugt keine Fehlermeldung', async ({ page }) => {
     await login(page);
 
-    const categoryTrigger = page.locator('text=/kategorie/i').first();
-    if (await categoryTrigger.count() === 0) {
-      test.skip(true, 'Kein Kategorie-Element gefunden – Test uebersprungen.');
+    const categorySelect = page
+      .locator('select[name="category"], select#category, select:has(option:has-text("Ohne Kategorie"))')
+      .first();
+
+    if (await categorySelect.count() === 0) {
+      test.skip(true, 'Kein Kategorie-Select gefunden – Test uebersprungen.');
     }
 
-    await categoryTrigger.click();
+    const nonEmptyOption = categorySelect
+      .locator('option:not([value=""]):not(:has-text("Ohne Kategorie"))')
+      .first();
 
-    // explizit auf den urspruenglichen Firestore-Fehler pruefen
+    if (await nonEmptyOption.count() > 0) {
+      const value = await nonEmptyOption.getAttribute('value');
+      await categorySelect.selectOption(value ?? undefined);
+    } else {
+      await categorySelect.selectOption({ index: 0 });
+    }
+
     const permissionError = page.locator('text=/Missing or insufficient permissions/i');
     await expect(permissionError).toHaveCount(0);
   });
