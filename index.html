@@ -1,247 +1,68 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Baustellen-Tracker</title>
-
-  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="icons/favicon-192x192.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="icons/favicon-512x512.png">
-  <link rel="manifest" href="icons/site.webmanifest">
-  <meta name="theme-color" content="#0f1117">
-
-  <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baustellen-Manager</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+        #auth-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .login-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); text-align: center; }
+        .login-box h1 { margin-bottom: 24px; color: #333; }
+        .login-btn { background: #4285F4; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 16px; cursor: pointer; }
+        .login-btn:hover { background: #357ae8; }
+        #app-container { display: none; }
+        .nav { background: white; padding: 16px 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; gap: 24px; align-items: center; }
+        .nav-item { padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+        .nav-item:hover { background: #f0f0f0; }
+        .nav-item.active { background: #667eea; color: white; }
+        .main-content { padding: 24px; max-width: 1200px; margin: 0 auto; }
+        .view-section { display: none; }
+        .task-form { background: white; padding: 24px; border-radius: 12px; margin-bottom: 24px; }
+        .task-form input, .task-form select { padding: 10px 14px; border: 1px solid #ddd; border-radius: 6px; margin-right: 12px; }
+        .task-form button { background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+    </style>
 </head>
 <body>
-
-  <div id="login-screen">
-    <div class="login-background"></div>
-    <div class="login-box">
-      <div class="login-logo">🏗️</div>
-      <h1 id="auth-title">Baustellen-Tracker</h1>
-      <p class="login-sub" id="auth-sub">Bitte mit deiner E-Mail-Adresse und deinem Passwort anmelden.</p>
-      <form id="login-form" autocomplete="on">
-        <input id="login-email" type="email" placeholder="E-Mail-Adresse" autocomplete="username">
-        <input id="login-password" type="password" placeholder="Passwort" autocomplete="current-password">
-        <div id="login-error" class="login-error hidden"></div>
-        <div id="login-success" class="login-success hidden"></div>
-        <button type="submit" class="btn-primary login-btn" id="btn-auth-submit">Anmelden</button>
-      </form>
-      <div class="login-links">
-        <a href="#" id="link-forgot">Passwort vergessen?</a>
-      </div>
-      <p class="login-hint">Die Daten werden zentral über Firebase synchronisiert.</p>
-    </div>
-  </div>
-
-  <div id="app" class="hidden">
-    <div id="pull-refresh-indicator" class="pull-refresh-indicator">
-      <span class="pull-refresh-icon">↓</span>
-    </div>
-
-    <header class="topbar">
-      <button class="hamburger" id="hamburger" aria-label="Menü öffnen">☰</button>
-      <span class="topbar-title">Baustellen Manager</span>
-      <button class="btn-logout" id="btn-logout" title="Abmelden">🔓</button>
-    </header>
-
-    <div class="sidebar-overlay hidden" id="sidebar-overlay"></div>
-
-    <nav class="sidebar" id="sidebar">
-      <div class="logo">Baustellen Manager</div>
-      <ul>
-        <li><a href="#" class="nav-link active" data-page="current">Aktuell</a></li>
-        <li><a href="#" class="nav-link" data-page="overview">Übersicht</a></li>
-        <li><a href="#" class="nav-link" data-page="calendar">Kalender</a></li>
-        <li><a href="#" class="nav-link" data-page="hours">Stunden</a></li>
-      </ul>
-      <div class="sidebar-footer">
-        <button class="btn-logout-sidebar" id="btn-theme-toggle">🌓 Farbschema wechseln</button>
-        <button class="btn-logout-sidebar" id="btn-change-password">🔑 Passwort ändern</button>
-        <button class="btn-logout-sidebar" id="btn-logout-sidebar">Abmelden</button>
-      </div>
-    </nav>
-
-    <main class="content">
-      <section id="page-current" class="page active">
-        <div class="page-header">
-          <h1>Aktuell – Meine To-Dos</h1>
-          <button class="btn-primary" id="btn-add-todo">+ To-Do</button>
+    <div id="auth-container">
+        <div class="login-box">
+            <h1>🏗️ Baustellen-Manager</h1>
+            <button class="login-btn" onclick="login()">Mit Google anmelden</button>
         </div>
-        <div id="todo-list"></div>
-      </section>
-
-      <section id="page-overview" class="page">
-        <div class="page-header">
-          <h1>Übersicht</h1>
-          <button class="btn-primary" id="btn-add-task">+ Aufgabe</button>
-        </div>
-        <div class="stats-bar" id="stats-bar"></div>
-        <div class="filter-bar" id="filter-bar">
-          <input id="search-input" type="text" placeholder="🔍 Suche nach Titel, Notiz, Verantwortlichem …" autocomplete="off">
-          <select id="filter-status" autocomplete="off">
-            <option value="all">Alle Status</option>
-            <option value="pending">⏳ Start ausstehend</option>
-            <option value="blocked">🚫 Blockiert</option>
-            <option value="inprogress">🔄 In Bearbeitung</option>
-            <option value="done">✅ Erledigt</option>
-          </select>
-          <select id="filter-owner" autocomplete="off">
-            <option value="all">Alle Verantwortlichen</option>
-          </select>
-        </div>
-        <div id="task-list"></div>
-      </section>
-
-      <section id="page-calendar" class="page">
-        <div class="page-header"><h1>Kalender / Zeitstrahl</h1></div>
-        <div id="gantt-container"></div>
-      </section>
-
-      <section id="page-hours" class="page">
-        <div class="page-header">
-          <h1>Arbeitsstunden</h1>
-          <button class="btn-primary" id="btn-add-hours">+ Eintrag</button>
-        </div>
-        <div class="stats-bar" id="hours-stats-bar"></div>
-        <div class="filter-bar" id="hours-filter-bar">
-          <select id="hours-filter-worker" autocomplete="off">
-            <option value="all">Alle Helfer</option>
-          </select>
-        </div>
-        <div id="hours-list"></div>
-      </section>
-    </main>
-  </div>
-
-  <div id="modal-task" class="modal hidden">
-    <div class="modal-box">
-      <h2 id="modal-task-title">Neue Aufgabe</h2>
-      <label>Titel
-        <input id="ti-title" type="text" placeholder="z.B. Rohbau fertigstellen" autocomplete="off">
-      </label>
-      <label>Status
-        <select id="ti-status" autocomplete="off">
-          <option value="pending">⏳ Start ausstehend</option>
-          <option value="blocked">🚫 Blockiert</option>
-          <option value="inprogress">🔄 In Bearbeitung</option>
-          <option value="done">✅ Erledigt</option>
-        </select>
-      </label>
-      <div class="row-2">
-        <label>Start<input id="ti-start" type="date" autocomplete="off"></label>
-        <label>Ende<input id="ti-end" type="date" autocomplete="off"></label>
-      </div>
-      <label>Budget
-        <input id="ti-budget" type="number" placeholder="0" min="0" autocomplete="off">
-      </label>
-      <label>Verantwortlicher
-        <input id="ti-owner" type="text" placeholder="z.B. Elektriker Müller" autocomplete="off">
-      </label>
-      <label>Hinweis
-        <textarea id="ti-note" rows="3" placeholder="Notizen, Details ..." autocomplete="off"></textarea>
-      </label>
-      <label>Link
-        <input id="ti-link" type="url" placeholder="https://" autocomplete="off">
-      </label>
-      <label>Datei-Name/Pfad
-        <input id="ti-file" type="text" placeholder="z.B. Angebot-Dachdecker.pdf" autocomplete="off">
-      </label>
-      <label>Anhang (Foto/Datei)
-        <input id="ti-file-upload" type="file" accept="image/*,.pdf" autocomplete="off">
-        <div id="ti-file-list" style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;"></div>
-      </label>
-      <input type="hidden" id="ti-id">
-      <input type="hidden" id="ti-parent">
-      <div class="modal-actions">
-        <button class="btn-secondary" id="btn-cancel-task">Abbrechen</button>
-        <button class="btn-primary" id="btn-save-task">Speichern</button>
-      </div>
     </div>
-  </div>
-
-  <div id="modal-todo" class="modal hidden">
-    <div class="modal-box">
-      <h2 id="modal-todo-title">Neues To-Do</h2>
-      <label>Titel
-        <input id="td-title" type="text" placeholder="To-Do beschreiben ..." autocomplete="off">
-      </label>
-      <label>Kategorie
-        <select id="td-category" autocomplete="off">
-          <option value="">Ohne Kategorie</option>
-        </select>
-      </label>
-      <label id="td-new-category-wrap" style="display:none;">Neue Kategorie
-        <input id="td-new-category" type="text" placeholder="Name der neuen Kategorie" autocomplete="off">
-      </label>
-      <label>Fällig am
-        <input id="td-due" type="date" autocomplete="off">
-      </label>
-      <label>Hinweis
-        <textarea id="td-note" rows="2" placeholder="Optionaler Hinweis ..." autocomplete="off"></textarea>
-      </label>
-      <input type="hidden" id="td-id">
-      <div class="modal-actions">
-        <button class="btn-secondary" id="btn-cancel-todo">Abbrechen</button>
-        <button class="btn-primary" id="btn-save-todo">Speichern</button>
-      </div>
+    
+    <div id="app-container">
+        <nav class="nav">
+            <div class="nav-item active" data-view="tasks">Aufgaben</div>
+            <div class="nav-item" data-view="helpers">Helfer</div>
+            <div style="flex: 1;"></div>
+            <div class="nav-item" onclick="logout()">Abmelden</div>
+        </nav>
+        
+        <div class="main-content">
+            <div id="tasks-view" class="view-section" style="display: block;">
+                <div class="task-form">
+                    <input type="text" id="task-title" placeholder="Aufgabentitel" />
+                    <select id="task-category"><option value="Unkategorisiert">Unkategorisiert</option></select>
+                    <input type="date" id="task-due-date" />
+                    <button onclick="addTask()">Hinzufügen</button>
+                </div>
+                <div id="tasks-container"></div>
+            </div>
+            <div id="helpers-view" class="view-section">
+                <div id="helpers-container"></div>
+            </div>
+        </div>
     </div>
-  </div>
-
-  <div id="modal-hours" class="modal hidden">
-    <div class="modal-box">
-      <h2 id="modal-hours-title">Neuer Zeiteintrag</h2>
-      <label>Helfer
-        <input id="hr-worker" type="text" list="hr-worker-list" placeholder="z.B. Peter Müller" autocomplete="off">
-        <datalist id="hr-worker-list"></datalist>
-      </label>
-      <label>Datum
-        <input id="hr-date" type="date" autocomplete="off">
-      </label>
-      <label>Gesamtstunden
-        <input id="hr-total" type="number" min="0" step="0.25" placeholder="z.B. 8" autocomplete="off">
-      </label>
-      <label>Verknüpfte Aufgabe (optional)
-        <select id="hr-task" autocomplete="off">
-          <option value="">– Keine –</option>
-        </select>
-      </label>
-      <input type="hidden" id="hr-id">
-      <div class="modal-actions">
-        <button class="btn-secondary" id="btn-cancel-hours">Abbrechen</button>
-        <button class="btn-primary" id="btn-save-hours">Speichern</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modal-pin" class="modal hidden">
-    <div class="modal-box">
-      <h2>Passwort ändern</h2>
-      <label>Aktuelles Passwort
-        <input id="pin-current" type="password" autocomplete="current-password">
-      </label>
-      <label>Neues Passwort
-        <input id="pin-new" type="password" autocomplete="new-password">
-      </label>
-      <label>Neues Passwort bestätigen
-        <input id="pin-confirm" type="password" autocomplete="new-password">
-      </label>
-      <div id="pin-error" class="login-error hidden"></div>
-      <div class="modal-actions">
-        <button class="btn-secondary" id="btn-cancel-pin">Abbrechen</button>
-        <button class="btn-primary" id="btn-save-pin">Speichern</button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    var saved = localStorage.getItem('bt-theme');
-    if (saved === 'light') document.documentElement.setAttribute('data-theme', 'light');
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <script src="https://npmcdn.com/flatpickr/dist/l10n/de.js"></script>
-  <script type="module" src="app.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script>
+        const firebaseConfig = { apiKey: "DEINE_API_KEY", authDomain: "DEIN_PROJEKT.firebaseapp.com", projectId: "DEIN_PROJEKT" };
+        firebase.initializeApp(firebaseConfig);
+    </script>
+    <script src="app.js"></script>
 </body>
 </html>
