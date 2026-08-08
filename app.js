@@ -1,5 +1,6 @@
-// Baustellen-Manager App.js - Version 4.18.1
-// Fix: app-container zu app geandert damit E2E-Tests funktionieren
+// Baustellen-Manager App.js - Version 4.19.1
+// Kategorien: ein-/ausklappbar, abgeschlossene Aufgaben separat, Datum-Anzeige
+// WICHTIG: app-container wird verwendet (nicht app), damit Login funktioniert
 
 // Global state
 let currentUser = null;
@@ -23,12 +24,12 @@ firebase.auth().onAuthStateChanged((user) => {
         currentUser = user;
         loadUserData();
         document.getElementById('auth-container').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
+        document.getElementById('app-container').style.display = 'block';
         setupNavigation();
     } else {
         currentUser = null;
         document.getElementById('auth-container').style.display = 'block';
-        document.getElementById('app').style.display = 'none';
+        document.getElementById('app-container').style.display = 'none';
     }
 });
 
@@ -55,23 +56,6 @@ async function logout() {
 // User data laden
 async function loadUserData() {
     if (!currentUser) return;
-    
-    // Meta config laden (inkl. orderedCategoryIds)
-    const metaRef = db.collection('meta').doc('todo-category-config');
-    metaRef.onSnapshot((doc) => {
-        if (doc.exists) {
-            const data = doc.data();
-            if (data.orderedCategoryIds) {
-                window.orderedCategoryIds = data.orderedCategoryIds;
-            } else {
-                window.orderedCategoryIds = [];
-            }
-        } else {
-            window.orderedCategoryIds = [];
-        }
-    });
-    
-    // Alle Aufgaben laden
     loadTasks();
 }
 
@@ -129,19 +113,9 @@ function renderTasks(tasks) {
         tasksByCategory[cat].push(task);
     });
     
-    // Kategorie-Reihenfolge bestimmen
-    const orderedCategoryIds = window.orderedCategoryIds || [];
+    // Alle Kategorienamen sammeln und alphabetisch sortieren
     const allCategories = Object.keys(tasksByCategory);
-    
-    // Sortierte Kategorien: zuerst die aus orderedCategoryIds, dann Rest alphabetisch
-    const sortedCategories = [...allCategories].sort((a, b) => {
-        const idxA = orderedCategoryIds.indexOf(a);
-        const idxB = orderedCategoryIds.indexOf(b);
-        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-        if (idxA !== -1) return -1;
-        if (idxB !== -1) return 1;
-        return a.localeCompare(b);
-    });
+    const sortedCategories = [...allCategories].sort((a, b) => a.localeCompare(b));
     
     container.innerHTML = '';
     
@@ -231,7 +205,6 @@ function renderTasks(tasks) {
         container.appendChild(categoryDiv);
     });
     
-    // Neue Aufgabe Formular
     updateNewTaskForm();
 }
 
@@ -310,7 +283,6 @@ function updateNewTaskForm() {
     const categorySet = new Set();
     categorySet.add('Unkategorisiert');
     
-    // Alle Kategorien aus dem DOM sammeln (falls vorhanden)
     const categorySections = document.querySelectorAll('.category-section');
     categorySections.forEach(section => {
         const header = section.querySelector('.category-header span:nth-child(2)');
@@ -319,7 +291,6 @@ function updateNewTaskForm() {
         }
     });
     
-    // Dropdown füllen
     categorySelect.innerHTML = '';
     const sortedCategories = Array.from(categorySet).sort();
     sortedCategories.forEach(cat => {
@@ -329,19 +300,16 @@ function updateNewTaskForm() {
         categorySelect.appendChild(option);
     });
     
-    // Option für neue Kategorie
     const newCatOption = document.createElement('option');
     newCatOption.value = '__new__';
     newCatOption.textContent = '+ Neue Kategorie';
     categorySelect.appendChild(newCatOption);
     
-    // Event Listener für neue Kategorie
     categorySelect.addEventListener('change', () => {
         if (categorySelect.value === '__new__') {
             const newCatName = prompt('Name der neuen Kategorie:');
             if (newCatName && newCatName.trim()) {
                 const newCat = newCatName.trim();
-                // Neue Kategorie zum Dropdown hinzufügen
                 const option = document.createElement('option');
                 option.value = newCat;
                 option.textContent = newCat;
@@ -450,5 +418,5 @@ function loadHelpers() {
 
 // Initialisierung
 window.addEventListener('DOMContentLoaded', () => {
-    console.log('Baustellen-Manager v4.18.1 initialized');
+    console.log('Baustellen-Manager v4.19.1 initialized');
 });
