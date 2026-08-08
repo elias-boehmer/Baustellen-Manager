@@ -1,6 +1,6 @@
 # 🏗️ Baustellen-Tracker
 
-Eine mobile-first Web-App zur Verwaltung von Bauprojekten, Aufgaben, To-Dos und Arbeitsstunden. Die App synchronisiert alle Daten in Echtzeit über Firebase und ist speziell für die Nutzung auf Android-Smartphones auf der Baustelle optimiert.
+Eine mobile-first Web-App zur Verwaltung von Bauprojekten, Aufgaben, To-Dos und Arbeitsstunden. Die App synchronisiert alle Daten in Echtzeit über Firebase und ist speziell für die Nutzung auf Android-Smartphones auf der Baustelle optimiert und ausgelegt.
 
 ## Inhaltsverzeichnis
 
