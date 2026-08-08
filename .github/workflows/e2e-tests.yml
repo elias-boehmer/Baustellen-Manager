@@ -1,0 +1,68 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Auf stabiles Pages-Deployment warten
+        env:
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+        run: |
+          URL="${E2E_BASE_URL:-https://elias-boehmer.github.io/Baustellen-Manager/}"
+          echo "Warte auf $URL (benoetige 3 aufeinanderfolgende Erfolge) ..."
+          SUCCESS_STREAK=0
+          for i in $(seq 1 40); do
+            BODY=$(curl -s "$URL")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+            if [ "$STATUS" = "200" ] && ! echo "$BODY" | grep -q "There isn't a GitHub Pages site here"; then
+              SUCCESS_STREAK=$((SUCCESS_STREAK + 1))
+              echo "Versuch $i: OK (Streak $SUCCESS_STREAK/3)"
+              if [ "$SUCCESS_STREAK" -ge 3 ]; then
+                echo "Seite ist stabil erreichbar."
+                echo "Zusaetzlicher Sicherheitspuffer: 20s warten, damit alle CDN-Knoten aktuell sind."
+                sleep 20
+                exit 0
+              fi
+            else
+              SUCCESS_STREAK=0
+              echo "Versuch $i: Status $STATUS oder 404-Inhalt erkannt, Streak zurueckgesetzt, warte 5s ..."
+            fi
+            sleep 5
+          done
+          echo "Seite war nach mehreren Minuten nicht stabil erreichbar."
+          exit 1
+
+      - name: Run E2E tests
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+        run: npx playwright test
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
