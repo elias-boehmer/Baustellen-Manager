@@ -1,5 +1,5 @@
-// Baustellen-Manager App.js - Version 4.18
-// Kategorien: benutzerdefinierte Reihenfolge, ein-/ausklappbar, abgeschlossene Aufgaben separat
+// Baustellen-Manager App.js - Version 4.18.1
+// Fix: app-container zu app geandert damit E2E-Tests funktionieren
 
 // Global state
 let currentUser = null;
@@ -23,12 +23,12 @@ firebase.auth().onAuthStateChanged((user) => {
         currentUser = user;
         loadUserData();
         document.getElementById('auth-container').style.display = 'none';
-        document.getElementById('app-container').style.display = 'block';
+        document.getElementById('app').style.display = 'block';
         setupNavigation();
     } else {
         currentUser = null;
         document.getElementById('auth-container').style.display = 'block';
-        document.getElementById('app-container').style.display = 'none';
+        document.getElementById('app').style.display = 'none';
     }
 });
 
@@ -450,5 +450,5 @@ function loadHelpers() {
 
 // Initialisierung
 window.addEventListener('DOMContentLoaded', () => {
-    console.log('Baustellen-Manager v4.18 initialized');
+    console.log('Baustellen-Manager v4.18.1 initialized');
 });
